@@ -1,0 +1,52 @@
+
+class AlertWindow extends Window
+
+	property String readOnly allowsNil thing = "default value"
+	default aNumber = 0x10c + 20 -- change the default value of a super
+	default aBoolean = true -- change the default value of a super
+	default aString = "hello there" .. " concated!" -- change the default value of a super
+	.. "oh but there's more!"
+	-- default subtitle = "overriding default value" -- change the default value of a super
+	default animal = Cat( "Fluffles" ) -- change the default value of a super
+	property Button link okayButton -- always use the interface name as the identifier, it can't have a default value
+	property {String} stringTable
+
+	static property String thingy -- static must be the first keyword
+
+	-- set name( name )
+	-- 	-- a setter. here you must manually set the value yourself (i.e. if you don't change it it will stay as-is)
+	-- 	name = string.upper( name )
+	-- 	self.name = name
+	-- end
+
+	-- didSet name( name )
+	-- 	-- the 'name' value has just been changed
+	-- 	log( "Name set to " .. name )
+	-- end
+
+	-- static set thingy( thingy )
+	-- 	-- a setter. here you must manually set the value yourself (i.e. if you don't change it it will stay as-is)
+	-- 	thingy = string.upper( thingy )
+	-- 	self.thingy = thingy
+	-- end
+
+	-- -- event handles do override each other if their name and phase is the same
+	-- event clearApperance( event: ReadyInterfaceEvent )
+
+	-- end
+
+	-- -- by default the phase is before
+	-- event explode ReadyInterfaceEvent.AFTER( event )
+
+	-- end
+
+	-- static String allowsNil, Number capitaliseAndLocation( String name = "oeed" )
+	-- 	local location = name:find( "o" )
+	-- 	return name:upper(), location
+	-- end 
+
+	-- static function display( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, Number defaultButton = 1 )
+	-- 	self.application.container:insert( AlertWindow() )
+	-- end
+
+end
