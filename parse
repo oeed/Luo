@@ -1,11 +1,28 @@
 dofile("serialise")
 
-local BLOCK_START_KEYWORDS = {
-	["if"] = true,
-	["for"] = true,
-	["while"] = true,
-	["function"] = true
+
+local LINE_START_POSITION = 1
+local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function"
+local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
+	[KEYWORD_PROPERTY] = true,
+	[KEYWORD_DEFAULT] = true,
+	[KEYWORD_SET] = true,
+	[KEYWORD_DIDSET] = true,
+	[KEYWORD_WILLSET] = true,
+	[KEYWORD_GET] = true,
+	[KEYWORD_EVENT] = true,
+	[KEYWORD_FUNCTION] = true,
+	[KEYWORD_STATIC] = true
 }
+
+local BLOCK_START_KEYWORDS = {
+	[KEYWORD_IF] = true,
+	[KEYWORD_FOR] = true,
+	[KEYWORD_WHILE] = true,
+	[KEYWORD_FUNCTION] = true
+}
+local STATIC_KEYWORDS
+
 
 local BLOCK_LEVEL_NONE, BLOCK_LEVEL_CLASS, BLOCK_LEVEL_FUNCTION = 0, 1, 2
 local IDENTIFIER_BLOCK_COMMENT_START, IDENTIFIER_BLOCK_STRING_START, IDENTIFIER_BLOCK_STOP, IDENTIFIER_DOUBLE_STRING, IDENTIFIER_SINGLE_STRING, IDENTIFIER_COMMENT, IDENTIFIER_ESCAPE = "--[[", "[[", "]]", "\"", "'", "--", "\\"
@@ -31,7 +48,7 @@ function parserError( message, lineNumber, linePosition )
 	linePosition = linePosition or currentLinePosition
 	error( "Parse error: " .. message .. "\n" ..
 			( lineNumber > 2 and lineNumber - 1 .. ": " .. lines[lineNumber - 1] .. "\n" or "" ) ..
-			lineNumber .. ": " .. lines[lineNumber] .. "\n" ..
+			lineNumber .. ": " .. lines[lineNumber]:gsub("\t", " ") .. "\n" ..
 			string.rep( " ", #tostring( lineNumber ) + 2 + linePosition ) .. "^" ..
 			( lineNumber < #lines and "\n" .. lineNumber + 1 .. ": " .. lines[lineNumber + 1] .. "\n" or "" ), 2 )
 
@@ -156,21 +173,6 @@ local blockLevel = BLOCK_LEVEL_NONE -- 1 is inside class, 2 is inside function a
 local currentClass
 local isClassDefinition = false
 local isStatic = false
-
-local LINE_START_POSITION = 1
-local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END = "class", "extends", "property", "default", "set", "didset", "willset", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end"
-local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
-	[KEYWORD_PROPERTY] = true,
-	[KEYWORD_DEFAULT] = true,
-	[KEYWORD_SET] = true,
-	[KEYWORD_DIDSET] = true,
-	[KEYWORD_WILLSET] = true,
-	[KEYWORD_GET] = true,
-	[KEYWORD_EVENT] = true,
-	[KEYWORD_FUNCTION] = true,
-	[KEYWORD_STATIC] = true
-}
-
 currentLine, currentLinePosition = 1, LINE_START_POSITION
 local currentLineLength, isEndOfFile = #lines[1], false
 function getLine()
@@ -310,6 +312,65 @@ end
 
 function demandNextType( description )
 	demandFirstMatch( "^(%s*)([{_%a][_%w][}_%a]*)", 4, description or "variable type" )
+end
+
+function firstParameters()
+	local openingBracket = isNext( "^%s*%(", true )
+	if openingBracket then
+		print("Got em!")
+		print( getLine())
+	else
+		parserError( "expected opening bracket for function parameters" )
+	end
+end
+
+-- capture the single parameter for getter/setter functions
+function captureSingleParameter( name )
+	local parameter = isNext( "^%s*%(%s*" .. name .. "%s*%)" , true )
+	if not parameter then
+		if name == "" then
+			parserError( "expected empty parameter brackets" )
+		else
+			parserError( "expected brackets and single parameter '" .. name .. "'" )
+		end
+	end
+end
+
+-- capture until the 'end' keyword of the current block
+function captureBlock()
+	local keyword
+	local startLine, startLinePosition = currentLine, currentLinePosition
+	local level = 1
+	repeat 
+		keyword = nextMatch( "(%l+)" )
+		print(keyword)
+		if not keyword then
+			parserError( "expected 'end' keyword to complete function" )
+		elseif keyword == KEYWORD_END then
+			print("level up")
+			level = level - 1
+		elseif BLOCK_START_KEYWORDS[keyword] then
+			print("level down")
+			level = level + 1
+		end
+	until level == 0
+	
+	local contents = ""
+	for i = startLine, currentLine do
+		if i == startLine or i == currentLine then
+			contents = contents .. lines[i]:sub( i == startLine and startLinePosition or 1, i == currentLine and currentLinePosition or nil )
+		else
+			contents = contents .. lines[i]
+		end
+		if i ~= currentLine then
+			contents = contents .. "\n"
+		end
+	end
+	return contents
+end
+
+function demandParameters()
+
 end
 
 function stepBack( keyword )
@@ -469,6 +530,24 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				else
 					parserError( "default expects equals sign and new default value after property name" )
 				end
+				isStatic = false
+			elseif keyword == KEYWORD_SET or keyword == KEYWORD_DIDSET or keyword == KEYWORD_WILLSET or keyword == KEYWORD_GET then
+				local name = demandImmediateNextName( "property name" )
+				local propertyTable
+				if isStatic then
+					propertyTable = currentClass.static.properties[name]
+				else
+					propertyTable = currentClass.instance.properties[name]
+				end
+				if not propertyTable then
+					parserError( "Attempted to define getter/setter for undefined property '" .. name .. "'. Property definitions must be before getter/setter declarations." )
+				elseif propertyTable[keyword] then
+					parserError( "Attempted to redefine '" .. keyword .. "' for property '" .. name .. "'." )
+				end
+				captureSingleParameter( keyword == KEYWORD_GET and "" or name )
+
+				local block = "function( self" .. ( keyword == KEYWORD_GET and "" or ( ", " .. name ) ) .." )" .. captureBlock()
+				propertyTable[keyword] = block
 				isStatic = false
 			else
 				-- break
