@@ -21,7 +21,17 @@ local BLOCK_START_KEYWORDS = {
 	[KEYWORD_WHILE] = true,
 	[KEYWORD_FUNCTION] = true
 }
-local STATIC_KEYWORDS
+
+local STATIC_KEYWORDS = {
+	[KEYWORD_PROPERTY] = true,
+	[KEYWORD_DEFAULT] = true,
+	[KEYWORD_SET] = true,
+	[KEYWORD_DIDSET] = true,
+	[KEYWORD_WILLSET] = true,
+	[KEYWORD_GET] = true,
+	[KEYWORD_EVENT] = true,
+	[KEYWORD_FUNCTION] = true,
+}
 
 
 local BLOCK_LEVEL_NONE, BLOCK_LEVEL_CLASS, BLOCK_LEVEL_FUNCTION = 0, 1, 2
@@ -479,6 +489,9 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 			local keyword = demandNextName( "property or function declaration or 'end'" )
 			print("trying keyword")
 			print(keyword)
+			if isStatic and not STATIC_KEYWORDS[keyword] then
+				parserError( "invalid keyword '" .. keyword .. "' after 'static'" )
+			end
 			if keyword == KEYWORD_END then
 				blockLevel = BLOCK_LEVEL_NONE
 				-- TODO: public the currentClass
@@ -529,7 +542,6 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				else
 					currentClass.instance.properties[name] = propertyTable
 				end
-				isStatic = false
 			elseif keyword == KEYWORD_DEFAULT then
 				print("DEFAULTTTTT")
 				local name = demandImmediateNextName( "property name" )
@@ -546,7 +558,6 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				else
 					parserError( "default expects equals sign and new default value after property name" )
 				end
-				isStatic = false
 			elseif keyword == KEYWORD_SET or keyword == KEYWORD_DIDSET or keyword == KEYWORD_WILLSET or keyword == KEYWORD_GET then
 				local name = demandImmediateNextName( "property name" )
 				local propertyTable
@@ -564,7 +575,6 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 
 				local block = "function( self" .. ( keyword == KEYWORD_GET and "" or ( ", " .. name ) ) .." )" .. captureBlock()
 				propertyTable[keyword] = block
-				isStatic = false
 			elseif keyword == KEYWORD_EVENT then
 				local name = demandImmediateNextName( "event function handle name" )
 				local eventClass, eventPhase, parameterName = captureEventParameter()
@@ -578,6 +588,10 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 			else
 				-- break
 				parserError( "unexpected keyword '" .. tostring(keyword) .. "', expected property/function declaration or 'end'." )
+			end
+
+			if isStatic and keyword == KEYWORD_STATIC then
+				isStatic = false
 			end
 		end
 	end
