@@ -336,6 +336,22 @@ function captureSingleParameter( name )
 	end
 end
 
+-- capture the single parameter for getter/setter functions
+function captureEventParameter()
+	local didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%.(%u+)%s+([_%a][_%w]*)%s*%)" )
+	if not didMatch then
+		print(getLine())
+		didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%s+([_%a][_%w]*)%s*%)" )
+		if not didMatch then
+			parserError( "expected parameter brackets, event class name, event phase (optional) and parameter name. For example: event explode( ReadyInterfaceEvent.AFTER event )" )
+		else
+			return matches[3], nil, matches[4]
+		end
+	else
+		return matches[3], matches[4], matches[5]
+	end
+end
+
 -- capture until the 'end' keyword of the current block
 function captureBlock()
 	local keyword
@@ -549,6 +565,16 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				local block = "function( self" .. ( keyword == KEYWORD_GET and "" or ( ", " .. name ) ) .." )" .. captureBlock()
 				propertyTable[keyword] = block
 				isStatic = false
+			elseif keyword == KEYWORD_EVENT then
+				local name = demandImmediateNextName( "event function handle name" )
+				local eventClass, eventPhase, parameterName = captureEventParameter()
+				local block, startLine = captureBlock()
+				local eventTable = { "function(self," .. parameterName ..")" .. block, startLine, eventClass, eventPhase }
+				if isStatic then
+					currentClass.static.eventHandles[name] = eventTable
+				else
+					currentClass.instance.eventHandles[name] = eventTable
+				end
 			else
 				-- break
 				parserError( "unexpected keyword '" .. tostring(keyword) .. "', expected property/function declaration or 'end'." )

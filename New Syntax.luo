@@ -36,6 +36,15 @@ class AlertWindow extends Window
 		self.thingy = thingy
 	end
 
+	-- event handles do override each other if their name and phase is the same
+	event clearApperance( ReadyInterfaceEvent.AFTER event )
+
+	end
+
+	event explode( ReadyInterfaceEvent event )
+		print("do stuff")
+	end
+	end
 
 	-- -- by default the phase is before
 	-- event explode ReadyInterfaceEvent.AFTER( event )
