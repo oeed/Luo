@@ -56,12 +56,15 @@ local currentLine, currentLinePosition
 function parserError( message, lineNumber, linePosition )
 	lineNumber = lineNumber or currentLine
 	linePosition = linePosition or currentLinePosition
-	error( "Parse error: " .. message .. "\n" ..
+	if lineNumber > #lines then
+		error( "Parse error: " .. message )
+	else
+		error( "Parse error: " .. message .. "\n" ..
 			( lineNumber > 2 and lineNumber - 1 .. ": " .. lines[lineNumber - 1] .. "\n" or "" ) ..
 			lineNumber .. ": " .. lines[lineNumber]:gsub("\t", " ") .. "\n" ..
 			string.rep( " ", #tostring( lineNumber ) + 2 + linePosition ) .. "^" ..
 			( lineNumber < #lines and "\n" .. lineNumber + 1 .. ": " .. lines[lineNumber + 1] .. "\n" or "" ), 2 )
-
+	end
 end
 
 local isBlockComment = false
@@ -217,7 +220,11 @@ end
 
 function firstMatch( match, index )
 	index = index or 3
-	local matchData = { getLine():find( match ) }
+	local line = getLine()
+	if not line then
+		parserError( "unexpected end of file (probably too many/too few 'end' keywords)" )
+	end
+	local matchData = { line:find( match ) }
 	local start, stop, keyword = matchData[1], matchData[2], matchData[index]
 	if stop then
 		local startPos, stopPos = start + currentLinePosition, stop + currentLinePosition - 1
@@ -236,7 +243,48 @@ function firstMatch( match, index )
 	if not keyword and isEndOfFile then
 		error( "unexpected end of file" )
 	end
-	return keyword
+	return keyword, matchData
+end
+
+-- capture the string up to a , or ) for a function parameter default value
+function captureParameterDefault()
+	local lineIndex = currentLine
+	local startLine, startLinePosition = currentLine, currentLinePosition
+	local stopLine, stopLinePosition
+	repeat
+		local line = lines[lineIndex]
+		local commentsOrStrings = linesCommentsOrStrings[lineIndex]
+		local roundBracketLevel = 1
+		local curlyBracketLevel = 0
+		for i = (lineIndex == currentLine and currentLinePosition or 1), #line do
+			if not commentsOrStrings[i] then
+				local char = line:sub( i, i )
+				if char == "(" then
+					roundBracketLevel = roundBracketLevel + 1
+				elseif char == ")" then
+					roundBracketLevel = roundBracketLevel - 1
+				elseif char == "{" then
+					curlyBracketLevel = curlyBracketLevel + 1
+				elseif char == "}" then
+					curlyBracketLevel = curlyBracketLevel - 1
+				end
+				if roundBracketLevel == 0 or (char == "," and roundBracketLevel == 1 and curlyBracketLevel == 0 ) then
+					stopLine, stopLinePosition = lineIndex, i
+					break
+				end
+			end
+		end
+		lineIndex = lineIndex + 1
+	until (stopLine and stopLinePosition) or lineIndex > linesCount
+
+	if stopLine and stopLinePosition then
+		local defaultValue = ""
+		for i = currentLine, stopLine do
+			defaultValue = defaultValue .. lines[i]:sub(i == currentLine and currentLinePosition or 1, i == stopLine and stopLinePosition or nil) .. (i == stopLine and "" or "\n")
+		end
+		currentLine, currentLinePosition = stopLine, stopLinePosition
+		return defaultValue
+	end
 end
 
 function isNext( match, captureIfFound )
@@ -320,8 +368,31 @@ function demandFirstMatch( match, index, description )
 	end
 end
 
+function nextType()
+	-- {String = Number}
+	local dictionary = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*=%s*[_%a][_%w]*%s*})", 4 )
+	if dictionary then
+		return dictionary, true
+	else
+		-- {String}
+		local array = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*})", 4 )
+		if array then
+			return array, true
+		else
+			-- String
+			return firstMatch( "^(%s*)([_%a][_%w]*)", 4 ), false
+		end
+	end
+end
+
 function demandNextType( description )
-	demandFirstMatch( "^(%s*)([{_%a][_%w][}_%a]*)", 4, description or "variable type" )
+	description = description or "variable type"
+	local match, isTable = nextType()
+	if match then
+		return match, isTable
+	else
+		parserError( description .. " was expected immediately but wasn't found." )
+	end
 end
 
 function firstParameters()
@@ -336,7 +407,7 @@ end
 
 -- capture the single parameter for getter/setter functions
 function captureSingleParameter( name )
-	local parameter = isNext( "^%s*%(%s*" .. name .. "%s*%)" , true )
+	local parameter = isNext( "^%s*%(%s*" .. name .. "%s*%)", true )
 	if not parameter then
 		if name == "" then
 			parserError( "expected empty parameter brackets" )
@@ -392,7 +463,7 @@ function captureBlock()
 			contents = contents .. "\n"
 		end
 	end
-	return contents
+	return contents, startLine
 end
 
 function demandParameters()
@@ -501,7 +572,7 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				local propertyType = demandNextType( "property type" )
 				local readOnly, allowsNil, link, name = false, false, false
 				repeat
-					local nextKeyword = demandImmediateNextName( "property type information (readOnly, allowsNil, etc.) or property name" )
+					local nextKeyword = demandImmediateNextName( "property type modifiers (readOnly, allowsNil, etc.) or property name" )
 					if nextKeyword == KEYWORD_READONLY then
 						readOnly = true
 					elseif nextKeyword == KEYWORD_ALLOWSNIL then
@@ -573,8 +644,8 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				end
 				captureSingleParameter( keyword == KEYWORD_GET and "" or name )
 
-				local block = "function( self" .. ( keyword == KEYWORD_GET and "" or ( ", " .. name ) ) .." )" .. captureBlock()
-				propertyTable[keyword] = block
+				local block, startLine = captureBlock()
+				propertyTable[keyword] = { "function(self" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) ..")" .. block, startLine }
 			elseif keyword == KEYWORD_EVENT then
 				local name = demandImmediateNextName( "event function handle name" )
 				local eventClass, eventPhase, parameterName = captureEventParameter()
@@ -584,6 +655,125 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 					currentClass.static.eventHandles[name] = eventTable
 				else
 					currentClass.instance.eventHandles[name] = eventTable
+				end
+			elseif keyword == KEYWORD_FUNCTION then
+				print("it's a func!")
+				local returnTypes = {}
+				local currentReturnType
+				local hasNext = false
+				local name
+				-- capture the return types
+				repeat
+					local nextKeyword = demandImmediateNextName( "return type modifiers (readOnly, allowsNil, etc.) or function name" )
+					if nextKeyword == KEYWORD_ALLOWSNIL then
+						if not currentReturnType then
+							parserError( "expected return type before 'allowsNil' modifier" )
+						end
+						currentReturnType.allowsNil = true
+						-- we can't modify the property any further, add the return type to the stack
+						table.insert( returnTypes, currentReturnType )
+						currentReturnType = nil
+					elseif currentReturnType then
+						-- nextKeyword is actually the function name, add the return type to the stack
+						name = nextKeyword
+						table.insert( returnTypes, currentReturnType )
+						currentReturnType = nil
+					else
+						currentReturnType = { type = nextKeyword, allowsNil = false }
+					end
+
+					hasNext = isNext( "^%s*%,", true )
+					if hasNext and name then
+						parserError( "invalid return type modifier '" .. name .. "'" )
+					end
+				until not currentReturnType and not hasNext
+
+				if not name then
+					name = demandImmediateNextName( "event function handle name" )
+				end
+
+				local functionTable = { false --[[ simply a placeholder to be once the block can be captured ]] }
+
+				-- capture the parameters
+				local parameters = {}
+				hasOpeningBracket = isNext( "^%s*%(%s*", true )
+				if not hasOpeningBracket then
+					parserError( "expected opening bracket for function parameters" )
+				end
+				repeat
+					local allowsNil, name = false
+					local parameterType, parameterIsTable = nextType()
+					print("PPP")
+					print(parameterType)
+					print(parameterIsTable)
+					while true do
+						local nextKeyword = immediateNextName()
+						print(nextKeyword)
+						if not nextKeyword then
+							if parameterType then
+								if parameterIsTable then
+									parserError( "expected modifier (" .. KEYWORD_ALLOWSNIL .. ") or property name" )
+								else
+									-- a type wasn't given, we'll allow anything (including nil)
+									name = parameterType
+									parameterType = nil
+									allowsNil = true
+									break
+								end
+							else
+								parserError( "expected parameter type, modifier (" .. KEYWORD_ALLOWSNIL .. ") or property name" )
+							end
+						elseif nextKeyword == KEYWORD_ALLOWSNIL then
+							if not parameterType then
+								parserError( "expected parameter type before modifier '" .. nextKeyword .. "'" )
+							end
+							allowsNil = true
+						elseif not parameterType then
+							parameterType = nextKeyword
+						else
+							name = nextKeyword
+							break
+						end
+					end
+					-- try and get the default value out of it
+					local hasEquals = isNext( "^(%s*)=(%s*)", true )
+					local defaultValue
+					if hasEquals then
+						defaultValue = captureParameterDefault()
+						print(defaultValue)
+						print("done default")
+					end
+
+					print("WE GOT THE NAMEZ")
+
+					print(allowsNil)
+					print(parameterType)
+					print(name)
+					print(defaultValue)
+					table.insert(parameters, {
+						allowsNil = allowsNil,
+						type = parameterType,
+						name = name,
+						defaultValue = defaultValue
+					})
+					print(getLine())
+					hasNext = isNext( "^%s*%,", true )
+				until not hasNext
+
+					print(serialise(parameters))
+
+				-- local eventClass, eventPhase, parameterName = captureEventParameter()
+				local block, startLine = captureBlock()
+				local functionString = "function(self,"
+				local parametersCount = #parameters
+				for i, parameter in ipairs( parameters ) do
+					functionString = functionString .. parameter.name .. (i ~= parametersCount and "," or "")
+				end
+				local functionTable = { functionString .. block, startLine, parameters, returnTypes }
+				if isStatic then
+					currentClass.static.functions[name] = functionTable
+				else
+					currentClass.instance.functions[name] = functionTable
 				end
 			else
 				-- break
@@ -598,3 +788,4 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 end
 
 print(serialise(currentClass))
+

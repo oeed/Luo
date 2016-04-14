@@ -28,10 +28,10 @@
 		},
 		functions = {
 			welcome = {
-				line = 39, -- for making error numbers link to the source
 				function( self, name )
 					log( "Welcome " .. name )
 				end,
+				31, -- for making error numbers link to the source
 				{
 					type = "string",
 					default = { "string", "oeed" }

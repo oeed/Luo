@@ -1,0 +1,7 @@
+
+local testFunc = [[return function( self, thing )
+	print("we start!")
+	print("doing stuff with " .. thing)
+end]]
+local loaded = loadstring( testFunc )()
+loaded()

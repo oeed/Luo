@@ -9,7 +9,7 @@ class AlertWindow extends Window
 	-- default subtitle = "overriding default value" -- change the default value of a super
 	default animal = Cat( "Fluffles" ) -- change the default value of a super
 	property Button link okayButton -- always use the interface name as the identifier, it can't have a default value
-	property {String} stringTable
+	property {String = Number} stringTable
 
 	static property String thingy -- static must be the first keyword
 
@@ -44,17 +44,25 @@ class AlertWindow extends Window
 	event explode( ReadyInterfaceEvent event )
 		print("do stuff")
 	end
-	end
 
 	-- -- by default the phase is before
 	-- event explode ReadyInterfaceEvent.AFTER( event )
 
 	-- end
 
-	-- static String allowsNil, Number capitaliseAndLocation( String name = "oeed" )
+	-- function String doStuff( String allowsNil name, balh )
+	-- end
+
+
+	-- function String allowsNil, Number capitaliseAndLocation( String name = "oeed" )
 	-- 	local location = name:find( "o" )
 	-- 	return name:upper(), location
-	-- end 
+	-- end
+
+	function String allowsNil, Number capitaliseAndLocation( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, {String = Number} defaultButton = 1 )
+		local location = name:find( "o" )
+		return name:upper(), location
+	end 
 
 	-- static function display( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, Number defaultButton = 1 )
 	-- 	self.application.container:insert( AlertWindow() )
