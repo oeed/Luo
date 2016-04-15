@@ -1,4 +1,3 @@
-
 class AlertWindow extends Window
 
 	property String readOnly allowsNil thing = "default value"
@@ -45,27 +44,14 @@ class AlertWindow extends Window
 		print("do stuff")
 	end
 
-	-- -- by default the phase is before
-	-- event explode ReadyInterfaceEvent.AFTER( event )
-
-	-- end
-
-	-- function String doStuff( String allowsNil name, balh )
-	-- end
-
-
-	-- function String allowsNil, Number capitaliseAndLocation( String name = "oeed" )
-	-- 	local location = name:find( "o" )
-	-- 	return name:upper(), location
-	-- end
-
 	function String allowsNil, Number capitaliseAndLocation( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, {String = Number} defaultButton = 1 )
 		local location = name:find( "o" )
 		return name:upper(), location
 	end 
 
-	-- static function display( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, Number defaultButton = 1 )
-	-- 	self.application.container:insert( AlertWindow() )
-	-- end
+		-- if no type is given then it can be any type (use nil if you want to return nothing)
+	static function display( message )
+
+	end
 
 end

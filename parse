@@ -1,5 +1,5 @@
+local startTime = os.clock()
 dofile("serialise")
-
 
 local LINE_START_POSITION = 1
 local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function"
@@ -231,7 +231,6 @@ function firstMatch( match, index )
 		currentLinePosition = stop + currentLinePosition
 		local commentsOrStrings = linesCommentsOrStrings[currentLine]
 		if commentsOrStrings[startPos] or commentsOrStrings[stopPos] then
-			-- print("BETWEEN STRING/COMMENT: " .. keyword)
 			while commentsOrStrings[currentLinePosition] do
 				-- skip over this block of unuseable line
 				currentLinePosition = currentLinePosition + 1
@@ -398,8 +397,6 @@ end
 function firstParameters()
 	local openingBracket = isNext( "^%s*%(", true )
 	if openingBracket then
-		print("Got em!")
-		print( getLine())
 	else
 		parserError( "expected opening bracket for function parameters" )
 	end
@@ -421,7 +418,6 @@ end
 function captureEventParameter()
 	local didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%.(%u+)%s+([_%a][_%w]*)%s*%)" )
 	if not didMatch then
-		print(getLine())
 		didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%s+([_%a][_%w]*)%s*%)" )
 		if not didMatch then
 			parserError( "expected parameter brackets, event class name, event phase (optional) and parameter name. For example: event explode( ReadyInterfaceEvent.AFTER event )" )
@@ -440,14 +436,11 @@ function captureBlock()
 	local level = 1
 	repeat 
 		keyword = nextMatch( "(%l+)" )
-		print(keyword)
 		if not keyword then
 			parserError( "expected 'end' keyword to complete function" )
 		elseif keyword == KEYWORD_END then
-			print("level up")
 			level = level - 1
 		elseif BLOCK_START_KEYWORDS[keyword] then
-			print("level down")
 			level = level + 1
 		end
 	until level == 0
@@ -511,9 +504,6 @@ end
 
 local i = 0
 while not isEndOfFile and not ( currentLinePosition > currentLineLength and currentLine + 1 > linesCount ) do
-	print("-- Cycle --")
-	print("Block level: " .. blockLevel)
-	print("Line: " .. currentLine)
 	if blockLevel == BLOCK_LEVEL_NONE then
 		-- we're expecting a class definition
 		local didJump = jumpToKeyword( KEYWORD_CLASS, position, line )
@@ -533,7 +523,6 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 					functions = {}
 				}
 			}
-			print(currentClass.className)
 			blockLevel = BLOCK_LEVEL_CLASS
 			isClassDefinition = true
 		else
@@ -558,8 +547,6 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 			end
 		else
 			local keyword = demandNextName( "property or function declaration or 'end'" )
-			print("trying keyword")
-			print(keyword)
 			if isStatic and not STATIC_KEYWORDS[keyword] then
 				parserError( "invalid keyword '" .. keyword .. "' after 'static'" )
 			end
@@ -597,9 +584,7 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				-- try and get the default value out of it
 				local hasEquals = isNext( "^(%s*)=(%s*)", true )
 				if hasEquals then
-					-- print(firstDefaultValue())
 					currentLinePosition = currentLineLength + 1
-					print("done line")
 				end
 
 				local propertyTable = {
@@ -614,13 +599,10 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 					currentClass.instance.properties[name] = propertyTable
 				end
 			elseif keyword == KEYWORD_DEFAULT then
-				print("DEFAULTTTTT")
 				local name = demandImmediateNextName( "property name" )
-				print(name)
 				local hasEquals = isNext( "^(%s*)=(%s*)", true )
 				if hasEquals then
 					local expression = demandFirstExpression( { [KEYWORD_DEFAULT] = true, [KEYWORD_STATIC] = true, [KEYWORD_PROPERTY] = true, [KEYWORD_SET] = true, [KEYWORD_GET] = true, [KEYWORD_DIDSET] = true, [KEYWORD_EVENT] = true, [KEYWORD_FUNCTION] = true, [KEYWORD_END] = true }, "default value expression" )
-					print(expression)
 					if isStatic then
 						currentClass.static.defaultValues[name] = expression
 					else
@@ -657,15 +639,25 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 					currentClass.instance.eventHandles[name] = eventTable
 				end
 			elseif keyword == KEYWORD_FUNCTION then
-				print("it's a func!")
 				local returnTypes = {}
 				local currentReturnType
 				local hasNext = false
 				local name
 				-- capture the return types
 				repeat
-					local nextKeyword = demandImmediateNextName( "return type modifiers (readOnly, allowsNil, etc.) or function name" )
-					if nextKeyword == KEYWORD_ALLOWSNIL then
+					local nextKeyword = immediateNextName( "return type modifiers (readOnly, allowsNil, etc.) or function name" )
+					if not nextKeyword then
+						-- no return type was given, hence we allow ANY return value and any amount of return values. If you don't want to return anything use nil
+						local returnTypesCount = #returnTypes
+						if currentReturnType then
+							-- the current return type is actually the function name
+							name = currentReturnType.type
+							break
+						else
+							-- no function name was given
+							parserError("expected function name")
+						end
+					elseif nextKeyword == KEYWORD_ALLOWSNIL then
 						if not currentReturnType then
 							parserError( "expected return type before 'allowsNil' modifier" )
 						end
@@ -702,13 +694,10 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 				end
 				repeat
 					local allowsNil, name = false
+					-- first we try to capture the type, however, this may also be the name. this is needed because the type isn't always a keyword (for tabes and dictionary types)
 					local parameterType, parameterIsTable = nextType()
-					print("PPP")
-					print(parameterType)
-					print(parameterIsTable)
 					while true do
 						local nextKeyword = immediateNextName()
-						print(nextKeyword)
 						if not nextKeyword then
 							if parameterType then
 								if parameterIsTable then
@@ -740,29 +729,17 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 					local defaultValue
 					if hasEquals then
 						defaultValue = captureParameterDefault()
-						print(defaultValue)
-						print("done default")
 					end
 
-					print("WE GOT THE NAMEZ")
-
-					print(allowsNil)
-					print(parameterType)
-					print(name)
-					print(defaultValue)
 					table.insert(parameters, {
 						allowsNil = allowsNil,
 						type = parameterType,
 						name = name,
 						defaultValue = defaultValue
 					})
-					print(getLine())
 					hasNext = isNext( "^%s*%,", true )
 				until not hasNext
 
-					print(serialise(parameters))
-
-				-- local eventClass, eventPhase, parameterName = captureEventParameter()
 				local block, startLine = captureBlock()
 				local functionString = "function(self,"
 				local parametersCount = #parameters
@@ -787,5 +764,7 @@ while not isEndOfFile and not ( currentLinePosition > currentLineLength and curr
 	end
 end
 
-print(serialise(currentClass))
-
+local h = io.open("Parsed", "w")
+h:write(serialise(currentClass))
+h:close()
+print("Parsed in " .. os.clock() - startTime .. "s!")
