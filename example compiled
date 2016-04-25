@@ -1,0 +1,367 @@
+dofile("serialise")
+
+-- local __CLASS__error = error
+
+-- local __CLASS__metatable_class__index = function(_,k)
+-- 	__CLASS__error("attempted to access non-existant class '" .. tostring(_) .. "' enum '" .. k .. "'")
+-- end
+
+-- local __CLASS__metatable_class__newindex = function(_,k,v)
+-- 	__CLASS__error("attempted to mutate class '" .. tostring(_) .. "' using key '" .. k .. "'")
+-- end
+
+-- local __CLASS__metatable_instance__index = function(_,k)
+-- 	__CLASS__error("attempted to access non-existant instance property '" .. k .. "' of '" .. tostring(_) .. "'")
+-- end
+
+-- local __CLASS__metatable_instance__newindex = function(_,k,v)
+-- 	__CLASS__error("attempted to set non-existant instance property '" .. k .. "' of '" .. tostring(_) .. "' to '" .. v .. "'")
+-- end
+
+-- local __CLASS__metatable_enum__index = function(_,k)
+-- 	__CLASS__error("attempted to access non-existant key '" .. k .. "' from enum '" .. tostring(_) .. "'")
+-- end
+
+-- local __CLASS__metatable_enum__newindex = function(_,k,v)
+-- 	__CLASS__error("attempted to mutate enum '" .. tostring(_) .. "' key '" .. tostring(k) .. "' to '" .. v .. "'")
+-- end
+
+-- local __CLASS__error_instance_readonly = function(_,k,v)
+-- 	__CLASS__error("attempted to set read only instance property '" .. k .. "' of '" .. tostring(_) .. "' to '" .. v .. "'")
+-- end
+
+-- local __CLASS__error_type_instance_property = function(_, k, t, v)
+-- 	__CLASS__error("attempted to set instance property '" .. k .. "' of '" .. tostring(_) .. "' to an invalid value '" .. tostring(v) .. "', expected '" .. t .. "'")
+-- end
+
+-- local __CLASS__error_type_instance_function = function(_, k, f, t, v)
+-- 	__CLASS__error("attempted to pass parameter '" .. k .. "' of '" .. tostring(_) .. "." .. f .. "' an invalid value '" .. tostring(v) .. "', expected '" .. t .. "'")
+-- end
+
+-- local __CLASS__error_function_super_no_index = function(_,k)
+-- 	__CLASS__error("attempted to access invalid index '" .. k .. "' of super '" .. tostring(_) .. "' (or the super has no super)")
+-- end
+
+-- local __CLASS__execute = function(func, env, ...)
+-- 	return setfenv(func, env)(...)
+-- end
+
+-- local __CLASS__type_check_String = function(v)
+-- 	return v == nil or type(v) ~= "string"
+-- end
+
+local __CLASS__instance_create = function(instanceType, instanceVariables, instanceFunctions, initialiseFunction, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, typeOfTree, ...)
+	local instance = {}
+	local instanceEnvironment = setmetatable({}, {
+		__index = function(_, k)
+			if not instanceVariables[k] then -- if an instance variable is nil and there is an upvalue local with the same name the instance variable will hide the upvalue, even when nil
+				return environmentClass[k]
+			end
+		end,
+		__newindex = function(_, k, v)
+			if not instanceVariables[k] then -- all instance variables hide upvalues, regardless of their value
+				environmentClass[k] = v -- TODO: should this be the class environment, or _G?
+			else
+				rawset(_, k, v)
+			end
+		end
+	})
+	for k, v in pairs(instanceVariables) do
+		instanceEnvironment[k] = __CLASS__execute(v, environmentClass)
+	end
+	local values = {}
+	for k,v in pairs(defaultValues) do
+		values[k] = __CLASS__execute(v, environmentClass)
+	end
+	local getLocks, setLocks = {}, {}
+	local supers = {}
+	local supers__tostrings = {}
+	local supersEnvironments = {}
+	local supersValues = {}
+	local __tostring = instanceType .. " of '" .. name .. "': " .. tostring(instance):sub(8)
+	setmetatable(instance, {
+		__index = function(_,k)
+			return instance__index[k](instance, k, values, instanceEnvironment, getLocks)
+		end,
+		__newindex = function(_,k,v)
+			instance__newindex[k](instance, k, v, values, instanceEnvironment, setLocks)
+		end,
+		__tostring = function() return __tostring end
+	})
+
+	for i, super_name in ipairs(supers_names) do
+		local super = {}
+		-- local superValues = setmetatable({}, {__index = values, __newindex = function(_,k,v)values[k] = v end})
+		local super__tostring = "super '" .. super_name .. "': " .. tostring(super):sub(8) .. " of " .. __tostring
+		local super__tostring_func = function() return super__tostring end
+		setmetatable(super, {
+			__index = function(_,k)
+				return instance__index[k](super, k, values, instanceEnvironment, getLocks)
+			end,
+			__newindex = function(_,k,v)
+				instance__newindex[k](super, k, v, values, instanceEnvironment, setLocks)
+			end,
+			__tostring = super__tostring_func
+		})
+		supers[i +1] = super
+		supers__tostrings[i +1] = super__tostring_func
+	end
+
+	for k, funcs in pairs(instanceFunctions) do
+		local isFirst = true
+		local superFuncs = {}
+		local stack = {}
+		local n = 1
+		for superI, func in pairs(funcs) do
+			if not isFirst then
+				stack[n] = {superI, func}
+				n = n + 1
+			else
+				isFirst = false
+			end
+		end
+		for i = n - 1, 1, -1 do
+			local details = stack[i]
+			local superI = details[1]
+			local func = setfenv(details[2](supers[superI], superFuncs[i + 1]), instanceEnvironment)
+			local super = superFuncs[i + 1]
+			local __index
+			if super then
+				__index = function(_, k, v)
+					if k == "super" then
+						return super
+					else
+						__CLASS__error_function_super_no_index(_, k, v)
+					end
+				end
+			else
+				__index = __CLASS__error_function_super_no_index
+			end
+			superFuncs[i] = setmetatable({}, {__index = __index, __newindex = __CLASS_error_super, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
+		end
+		values[k] = setfenv(funcs[1](instance, superFuncs[1]), instanceEnvironment)
+	end
+
+	local typeOfTree = {
+		Cat = true,
+		Animal = true,
+		Object = true,
+	}
+	values.typeOf = function(_,other)
+		return typeOfTree[other]
+	end
+
+	if initialiseFunction then
+		__CLASS__execute(initialiseFunction, instanceEnvironment, instance, ...)
+	end
+	return instance
+end
+
+-- local __CLASS__error_proxy = function(name, startLine, func)
+-- 	return select(2, xpcall(func,  function(err)
+-- 		local _, trace = pcall(error, "<@", 3)
+-- 		local lineNumber = trace:match(":(%d+): <@")
+-- 		print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+-- 	end))
+-- end
+
+-- END TOP
+
+local __CLASS__static_Cat = {}
+Cat = {}
+local __CLASS__environment_file_1 = setmetatable({}, { __index = _G })
+setfenv(loadstring([[local CONST_VARIABLE = "THING" window = 4]]), __CLASS__environment_file_1)()
+
+local __CLASS__initialise_instance_Cat = function(self, arg1, arg2)
+	print("init")
+	print(self)
+	print(arg1)
+	print(arg2)
+	print(CONST_VARIABLE)
+	print(window)
+	print("anInstanceVariable " .. tostring(anInstanceVariable))
+	print(self)
+end
+local __CLASS__defaultvalues_instance_Cat = {
+	aString = loadstring("return " .. [["hello there" .. " concated!"
+	.. "oh but there's more!"]])
+}
+local __CLASS__readOnly_instance_Cat = {}
+local __CLASS__enum_Cat_styles = { LIST = 1; THUMBNAIL = 2; }
+local __CLASS__tostring_enum_Cat_styles = "enum '" .. "Cat.styles" .. "': " .. tostring(__CLASS__enum_Cat_styles):sub(8)
+local __CLASS__values_class_Cat = setmetatable({
+	static = __CLASS__static_Cat,
+	styles = setmetatable(__CLASS__enum_Cat_styles,{
+		-- TODO: enum values are mutable because a proxy can't be used (for looping over it). in 5.2 there are __pairs and __ipairs. for next there is this: __next = function(t, k) return next(priv, k) end
+		__index = __CLASS__metatable_enum__index,
+		__newindex = __CLASS__metatable_enum__newindex,
+		__tostring = function()return __CLASS__tostring_enum_Cat_styles end,
+	})
+}, {__index = __CLASS__metatable_class__index})
+local __CLASS__function_instance_Cat_capitaliseAndLocation = function(self, super)
+	-- to allow for custom environments, we need to have a unique version of the function each time
+	return function(__CLASS__self_passed,name,char,callback,buttons,defaultButton)
+		__CLASS__self_passed = nil
+		if __CLASS__type_check_String(name) then
+			return __CLASS__error_type_instance_function(self, "name", "capitaliseAndLocation", "String", name)
+		elseif __CLASS__type_check_String(char) then
+			return __CLASS__error_type_instance_function(self, "char", "capitaliseAndLocation", "String", char)
+		-- etc..
+		end
+
+		local location = name:find( char )
+		print("capitaliseAndLocation")
+		print(self)
+		print(tostring(super))
+		print(tostring(super.super))
+		print("calling animat super")
+		print(super("namess", "am"))
+		print("***")
+		print("anInstanceVariable " .. tostring(anInstanceVariable))
+		return name:upper(), location
+	end
+end
+local __CLASS__function_instance_Animal_capitaliseAndLocation = function(self, super)
+	-- to allow for custom environments, we need to have a unique version of the function each time
+	return function(__CLASS__self_passed,name,char,callback,buttons,defaultButton)
+		__CLASS__self_passed = nil
+	print("doing the funk")
+	print(tostring(name))
+	print(tostring(char))
+		if __CLASS__type_check_String(name) then
+			return __CLASS__error_type_instance_function(self, "name", "capitaliseAndLocation", "String", name)
+		elseif __CLASS__type_check_String(char) then
+			return __CLASS__error_type_instance_function(self, "char", "capitaliseAndLocation", "String", char)
+		-- etc..
+		end
+		print("Animal vv")
+		print(self)
+		print(super)
+		print(super(10))
+		print("anInstanceVariable " ..tostring(anInstanceVariable))
+		return name .. "ani"
+	end
+end
+local __CLASS__function_instance_Object_capitaliseAndLocation = function(self, super) -- TODO: maybe self_ should be used below instead of self?
+	-- to allow for custom environments, we need to have a unique version of the function each time
+	return function(__CLASS__self_passed,num)
+		__CLASS__self_passed = nil
+		print("Object!!")
+		print(self)
+		print(super)
+		print(num)
+		return num + 5
+	end
+end
+
+local __CLASS__metatable_instance__index_Cat = setmetatable({
+	-- if there is a getter use that purely
+	thing = function(self, key, values, environment, locks)
+		if locks[key] then
+			return values[key]
+		else
+			locks[key] = true
+			local v = {__CLASS__execute(function(self)
+				-- user code
+				print("GETTERRR")
+				print("anInstanceVariable " .. tostring(anInstanceVariable))
+				return self.thing
+			end, environment, self)}
+			locks[key] = nil
+			return unpack(v)
+		end
+	end,
+	-- otherwise, just return the value
+	aString = function(self, key, values)
+		return values[key]
+	end,
+	capitaliseAndLocation = function(self, key, values, environment, locks)
+		-- TODO: we don't want to have to call setfenv here (it's about 100 times slower)
+		return values[key]
+	end
+}, {__index = __CLASS__metatable_instance__index})
+local __CLASS__functions_instance_Cat = {
+	capitaliseAndLocation = {__CLASS__function_instance_Cat_capitaliseAndLocation, __CLASS__function_instance_Animal_capitaliseAndLocation, __CLASS__function_instance_Object_capitaliseAndLocation}
+}
+local __CLASS__willSet_instance_Cat_thing = function(self, thing)
+	-- user code
+	print("will set")
+end
+local __CLASS__set_instance_Cat_thing = function(self, thing)
+	-- user code
+	print("oi set")
+	print(thing)
+	self.thing = "6fsd"
+end
+local __CLASS__didSet_instance_Cat_thing = function(self, thing)
+	-- user code
+	print("it was set to " .. tostring(thing))
+end
+local __CLASS__metatable_instance__newindex_Cat = setmetatable({
+	stringTable = __CLASS__error_instance_readonly,
+	somethingElseReadonly = __CLASS__error_instance_readonly,
+	capitaliseAndLocation = __CLASS__error_instance_set_function,
+	thing = function(self, key, value, values, environment, locks)
+		if __CLASS__type_check_String(value) then
+			__CLASS__error_type_instance_property(self, key, "String", value)
+		end
+		if locks[key] then
+			values[key] = value
+		else
+			locks[key] = true
+			-- if there is a willSet, add this
+				__CLASS__execute(__CLASS__willSet_instance_Cat_thing, environment, self, value)
+
+			-- if there is a set, add this
+				__CLASS__execute(__CLASS__set_instance_Cat_thing, environment, self, value)
+				-- if there is a didSet, add this
+				__CLASS__execute(__CLASS__didSet_instance_Cat_thing, environment, self, values[key])
+			-- else
+				-- values[key] = value
+				-- if there is a didSet, add this
+				-- __CLASS__execute(__CLASS__didSet_instance_Cat_thing environment, self, value) -- we can use value because we know that it's definintely the value
+
+			locks[key] = nil
+		end
+	end,
+	-- otherwise, just set the value
+	otherThing = function(self, key, value, values, environment)
+		values[key] = value
+	end
+}, {__index = __CLASS__metatable_instance__index})
+
+local __CLASS__instancevariables_instance_Cat = {
+	anInstanceVariable = loadstring("return " .. "32\9")
+}
+local __CLASS__typeof_tree_instance_Cat = {
+	Cat = true,
+	Animal = true,
+	Object = true,
+}
+local __CLASS__tostring_class_Cat = "class '" .. "Cat" .. "': " .. tostring(Cat):sub(8)
+local __CLASS__super_names_Cat = {"Animal", "Object"}
+setmetatable( Cat, {
+	__index = __CLASS__values_class_Cat,
+	__newindex = __CLASS__metatable__newindex,
+	__call = function(_, ...)
+		return __CLASS__instance_create("instance", __CLASS__instancevariables_instance_Cat, __CLASS__functions_instance_Cat, __CLASS__initialise_instance_Cat, __CLASS__defaultvalues_instance_Cat, __CLASS__environment_file_1, "Cat", __CLASS__metatable_instance__index_Cat, __CLASS__metatable_instance__newindex_Cat, __CLASS__super_names_Cat, __CLASS__typeof_tree_instance_Cat, ...)
+	end,
+	__tostring = function() return __CLASS__tostring_class_Cat end
+})
+__CLASS__static_Cat = __CLASS__instance_create("static", __CLASS__instancevariables_instance_Cat, __CLASS__functions_instance_Cat, __CLASS__initialise_instance_Cat, __CLASS__defaultvalues_instance_Cat, __CLASS__environment_file_1, "Cat", __CLASS__metatable_instance__index_Cat, __CLASS__metatable_instance__newindex_Cat, __CLASS__super_names_Cat, __CLASS__typeof_tree_instance_Cat)
+
+print(Cat)
+local cat = Cat("donkey", "apple")
+print(cat)
+print(cat.aString)
+print("^^")
+print(cat.thing)
+cat.thing = "dg"
+print(Cat.styles)
+for k, v in pairs(Cat.styles) do
+	print(k)
+end
+print(serialise(Cat.styles))
+print(cat.capitaliseAndLocation)
+print(cat:capitaliseAndLocation("what", "a"))
+print(Cat.static)

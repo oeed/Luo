@@ -1,0 +1,195 @@
+local floor, insert = math.floor, table.insert
+
+local parsed, fileEnvironments = loadfile( "parse" )( "AlertWindow.luo", "Cat.luo" )
+print("Starting compile...")
+local file = ""
+
+local function addInclude(name)
+	local h = io.open("includes/" .. name, "r")
+	if h then
+		file = file .. h:read("*all")
+		h:close()
+	end
+end
+
+local function add(str, ...)
+	file = file .. string.format(str, ...)
+end
+
+-- escape square brackets
+local function escapeSquare(str)
+	return str:gsub("%[(=*)%[", "[%1=["):gsub("%](=*)%]", "]%1=]")
+end
+
+local idN = 1
+local idPrefix = "__CLASS__"
+local idChars = {"0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"}
+local idCharsLength = #idChars
+local function nextID()
+	local id = ""
+	local rem = idN
+	while rem > 0 do
+		id = idChars[(rem - 1) % idCharsLength + 1] .. id
+		rem = floor((rem - 1) / idCharsLength)
+	end
+	idN = idN + 1
+	return idPrefix .. id
+end
+
+local function addFunction(str, ...)
+	local functionID = nextID()
+	add("local function %s%s ", functionID, string.format(str, ...))
+	return functionID
+end
+
+-- first add all the built in functions
+
+local functionErrorID = addFunction([[(m)error(m,3)end]])
+
+local functionErrorIDs = {
+	metatable = {
+		class = {
+			index = addFunction([[(_,k)%s("attempted to access non-existant enum '"..k.."' of class '"..tostring(_).."'")end]], functionErrorID),
+			newindex = addFunction([[(_,k,v)%s("attempted to mutate class '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
+		},
+		instance = {
+			index = addFunction([[(_,k)%s("attempted to access non-existant property '"..tostring(_).."' enum '"..k.."'")end]], functionErrorID),
+			newindex = addFunction([[(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
+		},
+		enum = {
+			index = addFunction([[(_,k)%s("attempted to access non-existant key '"..k.."' from enum '"..tostring(_).."'")end]], functionErrorID),
+			newindex = addFunction([[(_,k,v)%s("attempted to mutate enum '"..tostring(_).."' key '"..tostring(k).."' to '"..v.."'")end]], functionErrorID)
+		},
+		super = {
+			index = addFunction([[(_,k)if k=="super"then %s("tried to access super of '" .. tostring(_) .. "', which does not have a super")else %s("attempted to access invalid index '" .. k .. "' of super '" .. tostring(_) .. "'")end end]], functionErrorID, functionErrorID),
+			newindex = addFunction([[(_,k,v)%s("attempted to mutate super '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
+		},
+	},
+	readOnly = addFunction([[(_,k,v)%s("attempted to set read only property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID),
+	type = {
+		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected '"..t.."'")end]], functionErrorID),
+		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected '"..t.."'")end]], functionErrorID),
+	}
+}
+
+local functionTypeCheckIDs = {
+	String = addFunction([[(v)return v==nil or type(v)~="string"end]])
+}
+
+local functionExecuteID = addFunction([[(f,e,...)return setfenv(f, e)(...)end]])
+
+-- TODO: minify when it 100% works
+local functionErrorProxyID = addFunction([[(name, startLine, func)
+	return select(2, xpcall(func,  function(err)
+		local _, trace = pcall(error, "<@", 3)
+		local lineNumber = trace:match(":(%%d+): <@")
+		print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+	end))
+end]])
+
+addInclude("top")
+
+-- now add the file environments
+local fileEnvironmentIDs = {}
+for i, blocks in ipairs(fileEnvironments) do
+	local id = nextID()
+	fileEnvironmentIDs[i] = id
+	add("local %s=setmetatable({},{__index=_G})", id)
+end
+
+-- now create empty tables for all the classes and their statics (which are filled later on) so we can reference them directly when needed
+local classStaticIDs = {}
+for className, _ in pairs(parsed) do
+	-- TODO: maybe add an option which makes these locals?
+	add("%s={}", className)
+	local staticID = nextID()
+	classStaticIDs[className] = staticID
+	add("local %s={}", staticID)
+end
+
+-- now create each class one by one
+for className, classDetails in pairs(parsed) do
+	-- create the tree of super details
+	local supersDetails = {classDetails}
+	local nextSuperName = classDetails.extends
+	local previousSuperName = className
+	while nextSuperName do
+		local superDetails = parsed[nextSuperName]
+		if not superDetails then
+			error("compile error: unable to find class '" .. nextSuperName .. "' to extend class '" .. previousSuperName .. "' from")
+		end
+		table.insert(supersDetails, superDetails)
+		previousSuperName = nextSuperName
+		nextSuperName = superDetails.extends
+	end
+
+	-- create the enums
+	local enumIDs = {}
+	local enumTypeCheckIDs = {}
+	for enumName, content in pairs(classDetails.enums) do
+		-- create enum's value table
+		local enumID = nextID()
+		enumIDs[enumName] = enumID
+		add("local %s=%s", enumID, content.values)
+		-- create the type checking function
+		-- TODO: enum type check function
+		-- local enumTypeCheckID = nextID()
+		-- add("__CLASS__")
+	end
+
+	local defaultValueIDs = {}
+	-- setup the instance and static values and functions
+	for mode, details in pairs({instance = classDetails.instance, static = classDetails.static}) do
+		-- create the detault values
+		defaultValuesID = nextID()
+		-- we need to collate all the places where default values are set and flatten it in to one table
+		local flattenedDefaultValues = {}
+		for i, superAllDetails in ipairs(supersDetails) do
+			local superDetails = superAllDetails[mode]
+			-- go through ourself and super
+			for propertyName, defaultValue in pairs(superDetails.defaultValues) do
+				-- first add the override default values
+				if not flattenedDefaultValues[propertyName] then
+					flattenedDefaultValues[propertyName] = defaultValue
+				end
+			end
+			for propertyName, propertyDetails in pairs(superDetails.properties) do
+				-- then try to get the default from the property definitions
+				local defaultValue = propertyDetails.defaultValue
+				if not flattenedDefaultValues[propertyName] then
+					flattenedDefaultValues[propertyName] = defaultValue
+				end
+			end
+		end
+
+		add("local %s={", defaultValuesID)
+		for propertyName, defaultValue in pairs(flattenedDefaultValues) do
+			add("[%q]=loadstring([[return %s]]),", propertyName, escapeSquare(defaultValue))
+		end
+		add("}")
+
+		-- local functionIDs = {}
+		-- for k, v in pairs(table_name) do
+		-- 	-- Code here...
+		-- end
+	end
+
+end
+
+-- run the other code in the files inside their environments
+for i, blocks in ipairs(fileEnvironments) do
+	local id = fileEnvironmentIDs[i]
+	for startLine, content in pairs(blocks) do
+		if startLine ~= "fileName" then
+			add("%s(%q,%d,setfenv(loadstring([[%s]]), %s))", functionErrorProxyID, blocks.fileName, startLine, escapeSquare(content), id)
+		end
+	end
+end
+
+print("Compile complete, saving...")
+local h = io.open("output.lua", "w")
+if h then
+	h:write(file)
+	h:close()
+end
+print("Saved. Compile complete.")

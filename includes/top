@@ -1,0 +1,112 @@
+dofile("serialise")
+
+local __CLASS__instance_create = function(instanceType, instanceVariables, instanceFunctions, initialiseFunction, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, typeOfTree, ...)
+	local instance = {}
+	local instanceEnvironment = setmetatable({}, {
+		__index = function(_, k)
+			if not instanceVariables[k] then -- if an instance variable is nil and there is an upvalue local with the same name the instance variable will hide the upvalue, even when nil
+				return environmentClass[k]
+			end
+		end,
+		__newindex = function(_, k, v)
+			if not instanceVariables[k] then -- all instance variables hide upvalues, regardless of their value
+				environmentClass[k] = v -- TODO: should this be the class environment, or _G?
+			else
+				rawset(_, k, v)
+			end
+		end
+	})
+	for k, v in pairs(instanceVariables) do
+		instanceEnvironment[k] = __CLASS__E(v, environmentClass)
+	end
+	local values = {}
+	for k,v in pairs(defaultValues) do
+		values[k] = __CLASS__E(v, environmentClass)
+	end
+	local getLocks, setLocks = {}, {}
+	local supers = {}
+	local supers__tostrings = {}
+	local supersEnvironments = {}
+	local supersValues = {}
+	local __tostring = instanceType .. " of '" .. name .. "': " .. tostring(instance):sub(8)
+	setmetatable(instance, {
+		__index = function(_,k)
+			return instance__index[k](instance, k, values, instanceEnvironment, getLocks)
+		end,
+		__newindex = function(_,k,v)
+			instance__newindex[k](instance, k, v, values, instanceEnvironment, setLocks)
+		end,
+		__tostring = function() return __tostring end
+	})
+
+	for i, super_name in ipairs(supers_names) do
+		local super = {}
+		-- local superValues = setmetatable({}, {__index = values, __newindex = function(_,k,v)values[k] = v end})
+		local super__tostring = "super '" .. super_name .. "': " .. tostring(super):sub(8) .. " of " .. __tostring
+		local super__tostring_func = function() return super__tostring end
+		setmetatable(super, {
+			__index = function(_,k)
+				return instance__index[k](super, k, values, instanceEnvironment, getLocks)
+			end,
+			__newindex = function(_,k,v)
+				instance__newindex[k](super, k, v, values, instanceEnvironment, setLocks)
+			end,
+			__tostring = super__tostring_func
+		})
+		supers[i +1] = super
+		supers__tostrings[i +1] = super__tostring_func
+	end
+
+	-- TODO: we might be able to place the function contents in here rather than calling it
+	for k, funcs in pairs(instanceFunctions) do
+		print("supers for ".. k)
+		local isFirst = true
+		local superFuncs = {}
+		local stack = {}
+		local n = 1
+		for superI, func in pairs(funcs) do
+			if not isFirst then
+				stack[n] = {superI, func}
+				n = n + 1
+			else
+				isFirst = false
+			end
+		end
+		for i = n - 1, 1, -1 do
+			local details = stack[i]
+			local superI = details[1]
+			local func = setfenv(details[2](supers[superI], superFuncs[i + 1]), instanceEnvironment)
+			local super = superFuncs[i + 1]
+			local __index
+			if super then
+				__index = function(_, k, v)
+					if k == "super" then
+						return super
+					else
+						__CLASS__7(_, k, v)
+					end
+				end
+			else
+				__index = __CLASS__7
+			end
+			superFuncs[i] = setmetatable({}, {__index = __index, __newindex = __CLASS__8, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
+		end
+		print(superFuncs[1])
+		values[k] = setfenv(funcs[1](instance, superFuncs[1]), instanceEnvironment)
+	end
+
+	local typeOfTree = {
+		Cat = true,
+		Animal = true,
+		Object = true,
+	}
+	values.typeOf = function(_,other)
+		return typeOfTree[other]
+	end
+
+	if initialiseFunction then
+		__CLASS__E(initialiseFunction, instanceEnvironment, instance, ...)
+	end
+	return instance
+end
+

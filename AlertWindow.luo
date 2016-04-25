@@ -1,14 +1,30 @@
+local A_CONSTANT = "hello"
+
 class AlertWindow extends Window
 
-	property String readOnly allowsNil thing = "default value"
+	local anInstanceVariable = A_CONSTANT
+	static local aStaticInstanceVariable = "starting value"
+
+	property String thing = "this is a default value"
 	default aNumber = 0x10c + 20 -- change the default value of a super
 	default aBoolean = true -- change the default value of a super
 	default aString = "hello there" .. " concated!" -- change the default value of a super
 	.. "oh but there's more!"
 	-- default subtitle = "overriding default value" -- change the default value of a super
 	default animal = Cat( "Fluffles" ) -- change the default value of a super
+	default another = {
+		one = 1;
+		two = 2;
+		three = 3;
+		four = 4;
+	}
 	property Button link okayButton -- always use the interface name as the identifier, it can't have a default value
-	property {String = Number} stringTable
+	property {String = Number} readOnly allowsNil stringTable
+
+	enum Number styles = {
+		LIST = 1;
+		THUMBNAIL = 2;
+	}
 
 	static property String thingy -- static must be the first keyword
 
@@ -44,7 +60,7 @@ class AlertWindow extends Window
 		print("do stuff")
 	end
 
-	function String allowsNil, Number capitaliseAndLocation( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, {String = Number} defaultButton = 1 )
+	function {String} allowsNil, Number capitaliseAndLocation( String message, String title = "Alert", Function allowsNil callback, {String} buttons = { "Okay" }, {String = Number} defaultButton = 1 )
 		local location = name:find( "o" )
 		return name:upper(), location
 	end 
@@ -53,5 +69,20 @@ class AlertWindow extends Window
 	static function display( message )
 
 	end
+
+	function initialise(arg1, arg2)
+		
+	end
+
+end
+
+local otherStuff = 5
+
+class Window
+	
+	property Number aNumber
+	property Boolean aBoolean
+	property String aString
+	property Cat animal
 
 end

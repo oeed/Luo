@@ -1,8 +1,19 @@
+-- TODO: do semi-colons work??
+-- TODO: prevent getters and setters on methods
+
+local args = { ... }
+if #args == 0 then
+	args = {
+		"AlertWindow.luo",
+		"Cat.luo"
+	}
+end
+
 local startTime = os.clock()
 dofile("serialise")
 
 local LINE_START_POSITION = 1
-local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function"
+local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum"
 local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
 	[KEYWORD_PROPERTY] = true,
 	[KEYWORD_DEFAULT] = true,
@@ -12,7 +23,10 @@ local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the
 	[KEYWORD_GET] = true,
 	[KEYWORD_EVENT] = true,
 	[KEYWORD_FUNCTION] = true,
-	[KEYWORD_STATIC] = true
+	[KEYWORD_STATIC] = true,
+	[KEYWORD_LOCAL] = true,
+	[KEYWORD_END] = true,
+	[KEYWORD_ENUM] = true
 }
 
 local BLOCK_START_KEYWORDS = {
@@ -31,740 +45,873 @@ local STATIC_KEYWORDS = {
 	[KEYWORD_GET] = true,
 	[KEYWORD_EVENT] = true,
 	[KEYWORD_FUNCTION] = true,
+	[KEYWORD_LOCAL] = true,
 }
 
+local DEFAULT_DELIMITERS = {
+	[KEYWORD_DEFAULT] = true,
+	[KEYWORD_STATIC] = true,
+	[KEYWORD_PROPERTY] = true,
+	[KEYWORD_LOCAL] = true,
+	[KEYWORD_ENUM] = true,
+	[KEYWORD_SET] = true,
+	[KEYWORD_GET] = true,
+	[KEYWORD_DIDSET] = true,
+	[KEYWORD_EVENT] = true,
+	[KEYWORD_FUNCTION] = true,
+	[KEYWORD_END] = true
+}
 
 local BLOCK_LEVEL_NONE, BLOCK_LEVEL_CLASS, BLOCK_LEVEL_FUNCTION = 0, 1, 2
 local IDENTIFIER_BLOCK_COMMENT_START, IDENTIFIER_BLOCK_STRING_START, IDENTIFIER_BLOCK_STOP, IDENTIFIER_DOUBLE_STRING, IDENTIFIER_SINGLE_STRING, IDENTIFIER_COMMENT, IDENTIFIER_ESCAPE = "--[[", "[[", "]]", "\"", "'", "--", "\\"
 
-local file = io.open( "New Syntax.luo", "r" )
-if not file then
-	error( "Failed to open file." )
-end
+local parsed = {}
+local fileEnvironments = {}
 
-local function findAll( str, match, positions, identifier )
-	local start, stop = nil, 0
-	repeat
-		start, stop = str:find( match, stop + 1 )
-		if start and not positions[start] then positions[start] = identifier end
-	until not stop
-end
-
-local lines, linesStringsPositions, linesCommentsPositions, linesComments, linesStrings, linesCommentsOrStrings, line = {}, {}, {}, {}, {}, {}, file:read()
-local currentLine, currentLinePosition
-
-function parserError( message, lineNumber, linePosition )
-	lineNumber = lineNumber or currentLine
-	linePosition = linePosition or currentLinePosition
-	if lineNumber > #lines then
-		error( "Parse error: " .. message )
-	else
-		error( "Parse error: " .. message .. "\n" ..
-			( lineNumber > 2 and lineNumber - 1 .. ": " .. lines[lineNumber - 1] .. "\n" or "" ) ..
-			lineNumber .. ": " .. lines[lineNumber]:gsub("\t", " ") .. "\n" ..
-			string.rep( " ", #tostring( lineNumber ) + 2 + linePosition ) .. "^" ..
-			( lineNumber < #lines and "\n" .. lineNumber + 1 .. ": " .. lines[lineNumber + 1] .. "\n" or "" ), 2 )
+for i, fileName in ipairs( args ) do
+	local fileStartTime = os.clock()
+	local file = io.open( fileName, "r" )
+	if not file then
+		error( "Failed to open file '" .. fileName .. "'." )
 	end
-end
 
-local isBlockComment = false
-local isBlockString = false
+	local function findAll( str, match, positions, identifier )
+		local start, stop = nil, 0
+		repeat
+			start, stop = str:find( match, stop + 1 )
+			if start and not positions[start] then positions[start] = identifier end
+		until not stop
+	end
 
--- read all the lines and get start and end locations for comments and strings so we can ignore them
-while line do
-	table.insert( lines, line )
+	local lines, linesStringsPositions, linesCommentsPositions, linesComments, linesStrings, linesCommentsOrStrings, line = {}, {}, {}, {}, {}, {}, file:read()
+	local currentLine, currentLinePosition
 
-	-- if we're in a block comment/string then find the first ]], if one isn't found then the whole line is a comment/string
-	-- 2nd: find the start of a block string, if found go back to start
-	-- 3rd: find all the starts of comments, then find the start and end of all strings
-	-- if the comment is within a string then ignore, otherwise remove the start/end of the string
+	function parserError( message, lineNumber, linePosition )
+		lineNumber = lineNumber or currentLine
+		linePosition = linePosition or currentLinePosition
+		if lineNumber > #lines then
+			error( "Parse error: " .. message )
+		else
+			error( "Parse error: " .. message .. "\n" ..
+				( lineNumber > 2 and lineNumber - 1 .. ": " .. lines[lineNumber - 1] .. "\n" or "" ) ..
+				lineNumber .. ": " .. lines[lineNumber]:gsub("\t", " ") .. "\n" ..
+				string.rep( " ", #tostring( lineNumber ) + 2 + linePosition ) .. "^" ..
+				( lineNumber < #lines and "\n" .. lineNumber + 1 .. ": " .. lines[lineNumber + 1] .. "\n" or "" ), 2 )
+		end
+	end
 
-	local linePosition = 1
+	local isBlockComment = false
+	local isBlockString = false
 
-	local positions = {}
-	findAll( line, "%-%-%[%[", positions, IDENTIFIER_BLOCK_COMMENT_START )
-	findAll( line, "%[%[", positions, IDENTIFIER_BLOCK_STRING_START )
-	findAll( line, "\"", positions, IDENTIFIER_DOUBLE_STRING )
-	findAll( line, "'", positions, IDENTIFIER_SINGLE_STRING )
-	findAll( line, "\\[\"\']", positions, IDENTIFIER_ESCAPE )
-	findAll( line, "%-%-", positions, IDENTIFIER_COMMENT )
-	local lineLength = #line
-	local stringPositions, commentPositions = {}, {}
-	local i = 1
-	while linePosition <= lineLength do
-		i = i + 1
-		if isBlockComment or isBlockString then
-			table.insert( isBlockComment and commentPositions or stringPositions, linePosition )
-			local start, stop = line:find( "]]" )
-			if stop then
-				table.insert( isBlockComment and commentPositions or stringPositions, linePosition + stop )
-				linePosition = linePosition + stop
-				if isBlockComment then
-					isBlockComment = false
+	-- read all the lines and get start and end locations for comments and strings so we can ignore them
+	while line do
+		table.insert( lines, line )
+
+		-- if we're in a block comment/string then find the first ]], if one isn't found then the whole line is a comment/string
+		-- 2nd: find the start of a block string, if found go back to start
+		-- 3rd: find all the starts of comments, then find the start and end of all strings
+		-- if the comment is within a string then ignore, otherwise remove the start/end of the string
+
+		local linePosition = 1
+
+		local positions = {}
+		findAll( line, "%-%-%[%[", positions, IDENTIFIER_BLOCK_COMMENT_START )
+		findAll( line, "%[%[", positions, IDENTIFIER_BLOCK_STRING_START )
+		findAll( line, "\"", positions, IDENTIFIER_DOUBLE_STRING )
+		findAll( line, "'", positions, IDENTIFIER_SINGLE_STRING )
+		findAll( line, "\\[\"\']", positions, IDENTIFIER_ESCAPE )
+		findAll( line, "%-%-", positions, IDENTIFIER_COMMENT )
+		local lineLength = #line
+		local stringPositions, commentPositions = {}, {}
+		local i = 1
+		while linePosition <= lineLength do
+			i = i + 1
+			if isBlockComment or isBlockString then
+				table.insert( isBlockComment and commentPositions or stringPositions, linePosition )
+				local start, stop = line:find( "]]" )
+				if stop then
+					table.insert( isBlockComment and commentPositions or stringPositions, linePosition + stop )
+					linePosition = linePosition + stop
+					if isBlockComment then
+						isBlockComment = false
+					else
+						isBlockString = false
+					end
 				else
-					isBlockString = false
+					table.insert( isBlockComment and commentPositions or stringPositions, lineLength + 1 )
+					break
 				end
 			else
-				table.insert( isBlockComment and commentPositions or stringPositions, lineLength + 1 )
-				break
-			end
-		else
-			-- otherwise or then, 1st: find the start of a block comment if found go back to start
-			local isDoubleString, isSingleString, isEscaped = false, false, false
-			for position = linePosition, lineLength do
-				local identifier = positions[position]
-				if identifier then
-					-- for blocks we can do another loop of the while loop to prevent repeating ourself
-					if identifier == IDENTIFIER_ESCAPE then
-						isEscaped = true
-					else
-						if identifier == IDENTIFIER_BLOCK_COMMENT_START then
-							isBlockComment = true
-							linePosition = position
-							break
-						elseif identifier == IDENTIFIER_BLOCK_STRING_START then
-							isBlockString = true
-							linePosition = position
-							break
-						elseif identifier == IDENTIFIER_COMMENT then
-							table.insert( commentPositions, position )
-							table.insert( commentPositions, lineLength + 1 )
-							linePosition = lineLength + 1
-							break
-						elseif not isEscaped and not isSingleString and identifier == IDENTIFIER_DOUBLE_STRING then
-							table.insert( stringPositions, position )
-							isDoubleString = not isDoubleString
-						elseif not isEscaped and not isDoubleString and identifier == IDENTIFIER_SINGLE_STRING then
-							table.insert( stringPositions, position )
-							isSingleString = not isSingleString
+				-- otherwise or then, 1st: find the start of a block comment if found go back to start
+				local isDoubleString, isSingleString, isEscaped = false, false, false
+				for position = linePosition, lineLength do
+					local identifier = positions[position]
+					if identifier then
+						-- for blocks we can do another loop of the while loop to prevent repeating ourself
+						if identifier == IDENTIFIER_ESCAPE then
+							isEscaped = true
+						else
+							if identifier == IDENTIFIER_BLOCK_COMMENT_START then
+								isBlockComment = true
+								linePosition = position
+								break
+							elseif identifier == IDENTIFIER_BLOCK_STRING_START then
+								isBlockString = true
+								linePosition = position
+								break
+							elseif identifier == IDENTIFIER_COMMENT then
+								table.insert( commentPositions, position )
+								table.insert( commentPositions, lineLength + 1 )
+								linePosition = lineLength + 1
+								break
+							elseif not isEscaped and not isSingleString and identifier == IDENTIFIER_DOUBLE_STRING then
+								table.insert( stringPositions, position )
+								isDoubleString = not isDoubleString
+							elseif not isEscaped and not isDoubleString and identifier == IDENTIFIER_SINGLE_STRING then
+								table.insert( stringPositions, position )
+								isSingleString = not isSingleString
+							end
+							isEscaped = false
 						end
-						isEscaped = false
 					end
 				end
-			end
-			if not isBlockComment and not isBlockString then
-				break
-			end
-		end
-	end
-
-	if #stringPositions % 2 ~= 0 then
-		parserError( "string started but not finished", #lines, lineLength )
-	end
-
-	-- for i = 0, #stringPositions / 2 + 1, 2 do
-	-- 	local start, stop = stringPositions[i] or 1, stringPositions[i + 1] or lineLength + 1
-	-- 	lineNoStrings = lineNoStrings .. line:sub(start, stop - 1)
-	-- end
-
-	table.insert( linesStringsPositions, stringPositions )
-	table.insert( linesCommentsPositions, commentPositions )
-
-	local comments, strings, commentsOrStrings = {}, {}, {} -- a table where, for each position (index), it is true if there is a comment or string in that position
-	for i = 1, #stringPositions / 2, 2 do
-		for j = stringPositions[i], stringPositions[i + 1] do
-			commentsOrStrings[j] = true
-			strings[j] = true
-		end
-	end
-	for i = 1, #commentPositions / 2, 2 do
-		for j = commentPositions[i], commentPositions[i + 1] do
-			commentsOrStrings[j] = true
-			comments[j] = true
-		end
-	end
-	table.insert( linesCommentsOrStrings, commentsOrStrings )
-	table.insert( linesComments, comments )
-	table.insert( linesStrings, strings )
-
-	line = file:read()
-end
-
-local linesCount = #lines
-
-local blockLevel = BLOCK_LEVEL_NONE -- 1 is inside class, 2 is inside function and more will be
-local currentClass
-local isClassDefinition = false
-local isStatic = false
-currentLine, currentLinePosition = 1, LINE_START_POSITION
-local currentLineLength, isEndOfFile = #lines[1], false
-function getLine()
-	if currentLinePosition <= currentLineLength then
-		return lines[currentLine]:sub( currentLinePosition )
-	else
-		currentLine = currentLine + 1
-		if currentLine > linesCount then
-			isEndOfFile = true
-		else
-			currentLinePosition = LINE_START_POSITION
-			currentLineLength = #lines[currentLine]
-			return getLine()
-		end
-	end
-end
-
-function nextMatch( match, index )
-	index = index or 3
-	local keyword
-	repeat
-		keyword = firstMatch( match, index )
-		if not keyword then
-			currentLinePosition = currentLineLength + 1
-		end
-	until isEndOfFile or keyword
-	if not keyword and isEndOfFile then
-		error( "unexpected end of file" )
-	end
-	return keyword
-end
-
-function firstMatch( match, index )
-	index = index or 3
-	local line = getLine()
-	if not line then
-		parserError( "unexpected end of file (probably too many/too few 'end' keywords)" )
-	end
-	local matchData = { line:find( match ) }
-	local start, stop, keyword = matchData[1], matchData[2], matchData[index]
-	if stop then
-		local startPos, stopPos = start + currentLinePosition, stop + currentLinePosition - 1
-		currentLinePosition = stop + currentLinePosition
-		local commentsOrStrings = linesCommentsOrStrings[currentLine]
-		if commentsOrStrings[startPos] or commentsOrStrings[stopPos] then
-			while commentsOrStrings[currentLinePosition] do
-				-- skip over this block of unuseable line
-				currentLinePosition = currentLinePosition + 1
-			end
-			-- this match was actually in a comment, try again
-			return firstMatch( match, index )
-		end
-	end
-	if not keyword and isEndOfFile then
-		error( "unexpected end of file" )
-	end
-	return keyword, matchData
-end
-
--- capture the string up to a , or ) for a function parameter default value
-function captureParameterDefault()
-	local lineIndex = currentLine
-	local startLine, startLinePosition = currentLine, currentLinePosition
-	local stopLine, stopLinePosition
-	repeat
-		local line = lines[lineIndex]
-		local commentsOrStrings = linesCommentsOrStrings[lineIndex]
-		local roundBracketLevel = 1
-		local curlyBracketLevel = 0
-		for i = (lineIndex == currentLine and currentLinePosition or 1), #line do
-			if not commentsOrStrings[i] then
-				local char = line:sub( i, i )
-				if char == "(" then
-					roundBracketLevel = roundBracketLevel + 1
-				elseif char == ")" then
-					roundBracketLevel = roundBracketLevel - 1
-				elseif char == "{" then
-					curlyBracketLevel = curlyBracketLevel + 1
-				elseif char == "}" then
-					curlyBracketLevel = curlyBracketLevel - 1
-				end
-				if roundBracketLevel == 0 or (char == "," and roundBracketLevel == 1 and curlyBracketLevel == 0 ) then
-					stopLine, stopLinePosition = lineIndex, i
+				if not isBlockComment and not isBlockString then
 					break
 				end
 			end
 		end
-		lineIndex = lineIndex + 1
-	until (stopLine and stopLinePosition) or lineIndex > linesCount
 
-	if stopLine and stopLinePosition then
-		local defaultValue = ""
-		for i = currentLine, stopLine do
-			defaultValue = defaultValue .. lines[i]:sub(i == currentLine and currentLinePosition or 1, i == stopLine and stopLinePosition or nil) .. (i == stopLine and "" or "\n")
+		if #stringPositions % 2 ~= 0 then
+			parserError( "string started but not finished", #lines, lineLength )
 		end
-		currentLine, currentLinePosition = stopLine, stopLinePosition
-		return defaultValue
-	end
-end
 
-function isNext( match, captureIfFound )
-	local matchData = { getLine():find( match ) }
-	local start, stop = matchData[1], matchData[2]
-	if stop then
-		if captureIfFound then
-			currentLinePosition = stop + currentLinePosition
-		end
-		return true, stop + currentLinePosition
-	else
-		return false
-	end
-end
+		-- for i = 0, #stringPositions / 2 + 1, 2 do
+		-- 	local start, stop = stringPositions[i] or 1, stringPositions[i + 1] or lineLength + 1
+		-- 	lineNoStrings = lineNoStrings .. line:sub(start, stop - 1)
+		-- end
 
--- capture the expression until one of the delimeters are reached and return it with comments removed
-function firstExpression( delimiters )
-	local line = getLine()
-	local capturedLines, startLine, endLine = captureToKeywords( delimiters )
-	local expression = ""
-	for lineNumber, startPos in pairs( capturedLines ) do
-		local stopPos = lineNumber == endLine and startPos or math.huge
-		startPos = lineNumber == endLine and 1 or startPos
-		local line = lines[lineNumber]
-		local lineNoComment = ""
-		local commentPositions, lineLength = linesCommentsPositions[lineNumber], #line
-		if startPos ~= stopPos then
-			for i = 0, #commentPositions / 2 + 1, 2 do
-				local start, stop = commentPositions[i] or 1, commentPositions[i + 1] or lineLength + 1
-				lineNoComment = lineNoComment .. line:sub( math.max( start, startPos), math.min( stop, stopPos) - 1 )
+		table.insert( linesStringsPositions, stringPositions )
+		table.insert( linesCommentsPositions, commentPositions )
+
+		local comments, strings, commentsOrStrings = {}, {}, {} -- a table where, for each position (index), it is true if there is a comment or string in that position
+		for i = 1, #stringPositions / 2, 2 do
+			for j = stringPositions[i], stringPositions[i + 1] do
+				commentsOrStrings[j] = true
+				strings[j] = true
 			end
-			expression = expression .. lineNoComment
 		end
+		for i = 1, #commentPositions / 2, 2 do
+			for j = commentPositions[i], commentPositions[i + 1] do
+				commentsOrStrings[j] = true
+				comments[j] = true
+			end
+		end
+		table.insert( linesCommentsOrStrings, commentsOrStrings )
+		table.insert( linesComments, comments )
+		table.insert( linesStrings, strings )
+
+		line = file:read()
 	end
-	return expression
-end
 
-function demandFirstExpression( delimiters, description )
-	description = description or "An expression"
-	local expression = firstExpression( delimiters )
-	if expression and not expression:match( "^%s*$" ) then
-		return expression
-	else
-		parserError( description .. " was expected but wasn't found anywhere." )
-	end
-end
+	local linesCount = #lines
 
-function nextName()
-	return nextMatch( "([_%a][_%w]*)" )
-end
-
-function immediateNextName()
-	return firstMatch( "^(%s*)([_%a][_%w]*)", 4 )
-end
-
-function demandNextName()
-	local name = nextName()
-	if name then
-		return name
-	else
-		parserError( "A name/keyword was expected but wasn't found anywhere." )
-	end
-end
-
-function demandImmediateNextName( description )
-	description = description or "name/keyword"
-	local name = immediateNextName()
-	if name then
-		return name
-	else
-		parserError( description .. " was expected immediately but wasn't found." )
-	end
-end
-
-function demandFirstMatch( match, index, description )
-	local match = firstMatch( match, index )
-	if match then
-		return match
-	else
-		parserError( description .. " was expected immediately but wasn't found." )
-	end
-end
-
-function nextType()
-	-- {String = Number}
-	local dictionary = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*=%s*[_%a][_%w]*%s*})", 4 )
-	if dictionary then
-		return dictionary, true
-	else
-		-- {String}
-		local array = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*})", 4 )
-		if array then
-			return array, true
+	local blockLevel = BLOCK_LEVEL_NONE -- 1 is inside class, 2 is inside function and more will be
+	local currentClass
+	local isClassDefinition = false
+	local isStatic = false
+	currentLine, currentLinePosition = 1, LINE_START_POSITION
+	local currentLineLength, isEndOfFile = #lines[1], false
+	function getLine()
+		if currentLinePosition <= currentLineLength then
+			local line = lines[currentLine]
+			if line then
+				return line:sub( currentLinePosition )
+			end
 		else
-			-- String
-			return firstMatch( "^(%s*)([_%a][_%w]*)", 4 ), false
-		end
-	end
-end
-
-function demandNextType( description )
-	description = description or "variable type"
-	local match, isTable = nextType()
-	if match then
-		return match, isTable
-	else
-		parserError( description .. " was expected immediately but wasn't found." )
-	end
-end
-
-function firstParameters()
-	local openingBracket = isNext( "^%s*%(", true )
-	if openingBracket then
-	else
-		parserError( "expected opening bracket for function parameters" )
-	end
-end
-
--- capture the single parameter for getter/setter functions
-function captureSingleParameter( name )
-	local parameter = isNext( "^%s*%(%s*" .. name .. "%s*%)", true )
-	if not parameter then
-		if name == "" then
-			parserError( "expected empty parameter brackets" )
-		else
-			parserError( "expected brackets and single parameter '" .. name .. "'" )
-		end
-	end
-end
-
--- capture the single parameter for getter/setter functions
-function captureEventParameter()
-	local didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%.(%u+)%s+([_%a][_%w]*)%s*%)" )
-	if not didMatch then
-		didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%s+([_%a][_%w]*)%s*%)" )
-		if not didMatch then
-			parserError( "expected parameter brackets, event class name, event phase (optional) and parameter name. For example: event explode( ReadyInterfaceEvent.AFTER event )" )
-		else
-			return matches[3], nil, matches[4]
-		end
-	else
-		return matches[3], matches[4], matches[5]
-	end
-end
-
--- capture until the 'end' keyword of the current block
-function captureBlock()
-	local keyword
-	local startLine, startLinePosition = currentLine, currentLinePosition
-	local level = 1
-	repeat 
-		keyword = nextMatch( "(%l+)" )
-		if not keyword then
-			parserError( "expected 'end' keyword to complete function" )
-		elseif keyword == KEYWORD_END then
-			level = level - 1
-		elseif BLOCK_START_KEYWORDS[keyword] then
-			level = level + 1
-		end
-	until level == 0
-	
-	local contents = ""
-	for i = startLine, currentLine do
-		if i == startLine or i == currentLine then
-			contents = contents .. lines[i]:sub( i == startLine and startLinePosition or 1, i == currentLine and currentLinePosition or nil )
-		else
-			contents = contents .. lines[i]
-		end
-		if i ~= currentLine then
-			contents = contents .. "\n"
-		end
-	end
-	return contents, startLine
-end
-
-function demandParameters()
-
-end
-
-function stepBack( keyword )
-	currentLinePosition = math.max( 1, currentLinePosition - #keyword )
-	if currentLinePosition < 1 then
-		currentLine = currentLine - 1
-	end
-end
-
-function jumpToKeyword( toKeyword )
-	local keyword
-	repeat 
-		keyword = nextName()
-	until not keyword or keyword == toKeyword
-	return toKeyword == keyword
-end
-
-function isComment( lineNumber, linePosition )
-	lineNumber = lineNumber or currentLine
-	linePosition = linePosition or currentLinePosition
-	return linesComments[lineNumber][linePosition] or false
-end
-
-function captureToKeywords( toKeywords )
-	local keyword
-	local startLine, startLinePosition = currentLine, currentLinePosition
-	repeat 
-		keyword = nextName()
-	until not keyword or toKeywords[keyword]
-	stepBack( keyword )
-	if startLine ~= currentLine or startLinePosition ~= currentLinePosition then
-		local capturedLines = {}
-		for i = startLine, currentLine do
-			capturedLines[i] = i == startLine and startLinePosition or ( i == currentLine and currentLinePosition or 1 )
-		end
-		return capturedLines, startLine, currentLine
-	else
-		return {}
-	end
-end
-
-local i = 0
-while not isEndOfFile and not ( currentLinePosition > currentLineLength and currentLine + 1 > linesCount ) do
-	if blockLevel == BLOCK_LEVEL_NONE then
-		-- we're expecting a class definition
-		local didJump = jumpToKeyword( KEYWORD_CLASS, position, line )
-		if didJump then
-			currentClass = {
-				className = demandImmediateNextName( "class name" ),
-				instance = {
-					properties = {},
-					defaultValues = {},
-					eventHandles = {},
-					functions = {}
-				},
-				static = {
-					properties = {},
-					defaultValues = {},
-					eventHandles = {},
-					functions = {}
-				}
-			}
-			blockLevel = BLOCK_LEVEL_CLASS
-			isClassDefinition = true
-		else
-			-- we're not in a class block, we can ignore this line
-			break
-		end
-
-	elseif blockLevel == BLOCK_LEVEL_CLASS then
-		if isClassDefinition then
-			-- we're expecting either the extends, implements, etc, statement OR a property declaration
-			local keyword = immediateNextName()
-			if keyword == KEYWORD_EXTENDS then
-				if currentClass.extends then
-					parserError( "class already extends '" .. "' " .. currentClass.extends .. ". Polyinheritance is not supported." )
-				end
-				currentClass.extends = demandImmediateNextName()
-			elseif NON_CLASS_TYPE_DECLARATION_KEYWORDS[keyword] then
-				isClassDefinition = false
-				stepBack( keyword )
+			currentLine = currentLine + 1
+			if currentLine > linesCount then
+				isEndOfFile = true
 			else
-				parserError( "unexpected keyword '" .. tostring(keyword) .. "', expected class type declaration (extends, implements, etc.) or property/function declaration." )
+				currentLinePosition = LINE_START_POSITION
+				currentLineLength = #lines[currentLine]
+				return getLine()
+			end
+		end
+	end
+
+	function nextMatch( match, index, allowEndOfFile )
+		index = index or 3
+		local keyword
+		repeat
+			keyword, _, endOfFile = firstMatch( match, index, allowEndOfFile )
+			if endOfFile then
+				return nil, true
+			end
+			if not keyword then
+				currentLinePosition = currentLineLength + 1
+			end
+		until isEndOfFile or keyword
+		if not keyword and isEndOfFile then
+			if allowEndOfFile then
+				return nil, true
+			end
+			error( "unexpected end of file" )
+		end
+		return keyword
+	end
+
+	function firstMatch( match, index, allowEndOfFile )
+		index = index or 3
+		local line = getLine()
+		if not line then
+			if allowEndOfFile then
+				return nil, nil, true
+			else
+				parserError( "unexpected end of file (probably too many/too few 'end' keywords)" )
+			end
+		end
+		local matchData = { line:find( match ) }
+		local start, stop, keyword = matchData[1], matchData[2], matchData[index]
+		if stop then
+			local startPos, stopPos = start + currentLinePosition, stop + currentLinePosition - 1
+			currentLinePosition = stop + currentLinePosition
+			local commentsOrStrings = linesCommentsOrStrings[currentLine]
+			if commentsOrStrings[startPos] or commentsOrStrings[stopPos] then
+				while commentsOrStrings[currentLinePosition] do
+					-- skip over this block of unuseable line
+					currentLinePosition = currentLinePosition + 1
+				end
+				-- this match was actually in a comment, try again
+				return firstMatch( match, index )
 			end
 		else
-			local keyword = demandNextName( "property or function declaration or 'end'" )
-			if isStatic and not STATIC_KEYWORDS[keyword] then
-				parserError( "invalid keyword '" .. keyword .. "' after 'static'" )
+			if line:match( "^(%s*)$" ) then
+				-- this line was all empty space, so it doesn't count as a first match, try the next line
+				currentLine = currentLine + 1
+				currentLinePosition = LINE_START_POSITION
+				return firstMatch(match, index)
 			end
-			if keyword == KEYWORD_END then
-				blockLevel = BLOCK_LEVEL_NONE
-				-- TODO: public the currentClass
-			elseif keyword == KEYWORD_STATIC then
-				isStatic = true
-			elseif keyword == KEYWORD_PROPERTY then
-				local propertyType = demandNextType( "property type" )
-				local readOnly, allowsNil, link, name = false, false, false
-				repeat
-					local nextKeyword = demandImmediateNextName( "property type modifiers (readOnly, allowsNil, etc.) or property name" )
-					if nextKeyword == KEYWORD_READONLY then
-						readOnly = true
-					elseif nextKeyword == KEYWORD_ALLOWSNIL then
-						allowsNil = true
-					elseif nextKeyword == KEYWORD_LINK then
-						link = true
-					else
-						name = nextKeyword
-					end
-				until name
+		end
+		if not keyword and isEndOfFile then
+			error( "unexpected end of file" )
+		end
+		return keyword, matchData
+	end
 
-				if isStatic then
-					if currentClass.static.properties[name] then
-						parserError( "duplicate static property for name '" .. name .. "'" )
+	-- capture the string up to a , or ) for a function parameter default value
+	function captureParameterDefault()
+		local lineIndex = currentLine
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		local stopLine, stopLinePosition
+		repeat
+			local line = lines[lineIndex]
+			local commentsOrStrings = linesCommentsOrStrings[lineIndex]
+			local roundBracketLevel = 1
+			local curlyBracketLevel = 0
+			for i = (lineIndex == currentLine and currentLinePosition or 1), #line do
+				if not commentsOrStrings[i] then
+					local char = line:sub( i, i )
+					if char == "(" then
+						roundBracketLevel = roundBracketLevel + 1
+					elseif char == ")" then
+						roundBracketLevel = roundBracketLevel - 1
+					elseif char == "{" then
+						curlyBracketLevel = curlyBracketLevel + 1
+					elseif char == "}" then
+						curlyBracketLevel = curlyBracketLevel - 1
 					end
+					if roundBracketLevel == 0 or (char == "," and roundBracketLevel == 1 and curlyBracketLevel == 0 ) then
+						stopLine, stopLinePosition = lineIndex, i
+						break
+					end
+				end
+			end
+			lineIndex = lineIndex + 1
+		until (stopLine and stopLinePosition) or lineIndex > linesCount
+
+		if stopLine and stopLinePosition then
+			local defaultValue = ""
+			for i = currentLine, stopLine do
+				defaultValue = defaultValue .. lines[i]:sub(i == currentLine and currentLinePosition or 1, i == stopLine and stopLinePosition or nil) .. (i == stopLine and "" or "\n")
+			end
+			currentLine, currentLinePosition = stopLine, stopLinePosition
+			return defaultValue
+		end
+	end
+
+	function isNext( match, captureIfFound )
+		local matchData = { getLine():find( match ) }
+		local start, stop = matchData[1], matchData[2]
+		if stop then
+			if captureIfFound then
+				currentLinePosition = stop + currentLinePosition
+			end
+			return true, stop + currentLinePosition
+		else
+			return false
+		end
+	end
+
+	-- capture the expression until one of the delimeters are reached and return it with comments removed
+	function firstExpression( delimiters )
+		local line = getLine()
+
+		local capturedLines, capturedLineStarts, startLine, endLine = captureToKeywords( delimiters )
+		local expression = ""
+		for _, lineNumber in ipairs( capturedLines ) do
+			local startPos = capturedLineStarts[lineNumber]
+			local stopPos = lineNumber == endLine and startPos or math.huge
+			startPos = lineNumber == endLine and 1 or startPos
+			local line = lines[lineNumber]
+			local lineNoComment = ""
+			local commentPositions, lineLength = linesCommentsPositions[lineNumber], #line
+			if startPos ~= stopPos then
+				for i = 0, #commentPositions / 2 + 1, 2 do
+					local start, stop = commentPositions[i] or 1, commentPositions[i + 1] or lineLength + 1
+					lineNoComment = lineNoComment .. line:sub( math.max( start, startPos), math.min( stop, stopPos) - 1 )
+				end
+				expression = expression .. lineNoComment
+			end
+		end
+		return expression
+	end
+
+	function demandFirstExpression( delimiters, description )
+		description = description or "An expression"
+		local expression = firstExpression( delimiters )
+		if expression and not expression:match( "^%s*$" ) then
+			return expression
+		else
+			parserError( description .. " was expected but wasn't found anywhere." )
+		end
+	end
+
+	function nextName( allowEndOfFile )
+		return nextMatch( "%s*([_%a][_%w]*)", nil, allowEndOfFile )
+	end
+
+	function immediateNextName()
+		return firstMatch( "^(%s*)([_%a][_%w]*)", 4 )
+	end
+
+	function demandNextName()
+		local name = nextName()
+		if name then
+			return name
+		else
+			parserError( "A name/keyword was expected but wasn't found anywhere." )
+		end
+	end
+
+	function demandImmediateNextName( description )
+		description = description or "name/keyword"
+		local name = immediateNextName()
+		if name then
+			return name
+		else
+			parserError( description .. " was expected immediately but wasn't found." )
+		end
+	end
+
+	function demandFirstMatch( match, index, description )
+		local match = firstMatch( match, index )
+		if match then
+			return match
+		else
+			parserError( description .. " was expected immediately but wasn't found." )
+		end
+	end
+
+	function nextType()
+		-- {String = Number}
+		local dictionary = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*=%s*[_%a][_%w]*%s*})", 4 )
+		if dictionary then
+			return dictionary, true
+		else
+			-- {String}
+			local array = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*})", 4 )
+			if array then
+				return array, true
+			else
+				-- String
+				return firstMatch( "^(%s*)([_%a][_%w]*)", 4 ), false
+			end
+		end
+	end
+
+	function demandNextType( description )
+		description = description or "variable type"
+		local match, isTable = nextType()
+		if match then
+			return match, isTable
+		else
+			parserError( description .. " was expected immediately but wasn't found." )
+		end
+	end
+
+	function firstParameters()
+		local openingBracket = isNext( "^%s*%(", true )
+		if openingBracket then
+		else
+			parserError( "expected opening bracket for function parameters" )
+		end
+	end
+
+	-- capture the single parameter for getter/setter functions
+	function captureSingleParameter( name )
+		local parameter = isNext( "^%s*%(%s*" .. name .. "%s*%)", true )
+		if not parameter then
+			if name == "" then
+				parserError( "expected empty parameter brackets" )
+			else
+				parserError( "expected brackets and single parameter '" .. name .. "'" )
+			end
+		end
+	end
+
+	-- capture the single parameter for getter/setter functions
+	function captureEventParameter()
+		local didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%.(%u+)%s+([_%a][_%w]*)%s*%)" )
+		if not didMatch then
+			didMatch, matches = firstMatch( "^%s*%(%s*([_%a][_%w]*)%s+([_%a][_%w]*)%s*%)" )
+			if not didMatch then
+				parserError( "expected parameter brackets, event class name, event phase (optional) and parameter name. For example: event explode( ReadyInterfaceEvent.AFTER event )" )
+			else
+				return matches[3], nil, matches[4]
+			end
+		else
+			return matches[3], matches[4], matches[5]
+		end
+	end
+
+	-- capture until the 'end' keyword of the current block
+	function captureBlock()
+		local keyword
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		local level = 1
+		repeat 
+			keyword = nextMatch( "(%l+)" )
+			if not keyword then
+				parserError( "expected 'end' keyword to complete function" )
+			elseif keyword == KEYWORD_END then
+				level = level - 1
+			elseif BLOCK_START_KEYWORDS[keyword] then
+				level = level + 1
+			end
+		until level == 0
+		
+		local contents = ""
+		for i = startLine, currentLine do
+			if i == startLine or i == currentLine then
+				contents = contents .. lines[i]:sub( i == startLine and startLinePosition or 1, i == currentLine and currentLinePosition or nil )
+			else
+				contents = contents .. lines[i]
+			end
+			if i ~= currentLine then
+				contents = contents .. "\n"
+			end
+		end
+		return contents, startLine
+	end
+
+	function demandParameters()
+
+	end
+
+	function stepBack( keyword )
+		currentLinePosition = math.max( 1, currentLinePosition - #keyword )
+		if currentLinePosition < 1 then
+			currentLine = currentLine - 1
+		end
+	end
+
+	function jumpToKeyword( toKeyword )
+		local keyword
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		repeat 
+			keyword, isEndOfFile = nextName( true )
+		until not keyword or keyword == toKeyword
+		local jumpedString = ""
+		for i = startLine, currentLine do
+			local line = lines[i]
+			local lineOut = ""
+			local lineComments = linesComments[i]
+			for n = (i == startLine and startLinePosition or 1), (i == currentLine and currentLinePosition - #toKeyword - 1 or #line) do
+				if not lineComments[n] then
+					lineOut = lineOut .. line:sub(n, n)
+				end
+			end
+			jumpedString = jumpedString .. lineOut .. "\n"
+		end
+		return toKeyword == keyword, jumpedString, startLine
+	end
+
+	function isComment( lineNumber, linePosition )
+		lineNumber = lineNumber or currentLine
+		linePosition = linePosition or currentLinePosition
+		return linesComments[lineNumber][linePosition] or false
+	end
+
+	function captureToKeywords( toKeywords )
+		local keyword
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		repeat 
+			keyword = nextName()
+		until not keyword or toKeywords[keyword]
+		stepBack( keyword )
+		if startLine ~= currentLine or startLinePosition ~= currentLinePosition then
+			local capturedLineStarts = {}
+			local capturedLines = {}
+			for i = startLine, currentLine do
+				table.insert( capturedLines, i )
+				capturedLineStarts[i] = i == startLine and startLinePosition or ( i == currentLine and currentLinePosition or 1 )
+			end
+			return capturedLines, capturedLineStarts, startLine, currentLine
+		else
+			return {}
+		end
+	end
+
+	local fileEnvironment = {
+		fileName = fileName
+	}
+	fileEnvironments[i] = fileEnvironment
+	while not isEndOfFile and not ( currentLinePosition > currentLineLength and currentLine + 1 > linesCount ) do
+		if blockLevel == BLOCK_LEVEL_NONE then
+			-- we're expecting a class definition
+			local didJump, jumpedString, startLine = jumpToKeyword( KEYWORD_CLASS, position, line )
+			if not jumpedString:match( "^(%s*)$" ) then
+				-- we only jumped more than just white space or nothing, it might be important
+				local existingLine = fileEnvironment[startLine]
+				if existingLine then
+					-- there might already be other code starting on this line (i.e. the class was on a single line), add to it rather than replacing
+					fileEnvironment[startLine] = existingLine .. " " .. jumpedString
 				else
-					if currentClass.instance.properties[name] then
-						parserError( "duplicate property for name '" .. name .. "'" )
-					end
+					fileEnvironment[startLine] = jumpedString
 				end
-
-				-- try and get the default value out of it
-				local hasEquals = isNext( "^(%s*)=(%s*)", true )
-				if hasEquals then
-					currentLinePosition = currentLineLength + 1
-				end
-
-				local propertyTable = {
-					type = propertyType,
-					allowsNil = allowsNil,
-					readOnly = readOnly,
-					link = link
+			end
+			if didJump then
+				local className = demandImmediateNextName( "class name" )
+				currentClass = {
+					className = className,
+					instance = {
+						properties = {},
+						defaultValues = {},
+						eventHandles = {},
+						functions = {},
+						instanceVariables = {}
+					},
+					static = {
+						properties = {},
+						defaultValues = {},
+						eventHandles = {},
+						functions = {},
+						instanceVariables = {}
+					},
+					enums = {},
+					fileEnvironment = i,
+					lineNumber = currentLine
 				}
-				if isStatic then
-					currentClass.static.properties[name] = propertyTable
-				else
-					currentClass.instance.properties[name] = propertyTable
+				if parsed[className] then
+					parserError( "A class has already been defined with the name '" .. className .. "'. Class names must be unique." )
 				end
-			elseif keyword == KEYWORD_DEFAULT then
-				local name = demandImmediateNextName( "property name" )
-				local hasEquals = isNext( "^(%s*)=(%s*)", true )
-				if hasEquals then
-					local expression = demandFirstExpression( { [KEYWORD_DEFAULT] = true, [KEYWORD_STATIC] = true, [KEYWORD_PROPERTY] = true, [KEYWORD_SET] = true, [KEYWORD_GET] = true, [KEYWORD_DIDSET] = true, [KEYWORD_EVENT] = true, [KEYWORD_FUNCTION] = true, [KEYWORD_END] = true }, "default value expression" )
+				blockLevel = BLOCK_LEVEL_CLASS
+				isClassDefinition = true
+			else
+				-- we're not in a class block, we can ignore this line
+				break
+			end
+
+		elseif blockLevel == BLOCK_LEVEL_CLASS then
+			if isClassDefinition then
+				-- we're expecting either the extends, implements, etc, statement OR a property declaration
+				local keyword = immediateNextName()
+				if keyword == KEYWORD_EXTENDS then
+					if currentClass.extends then
+						parserError( "class already extends '" .. "' " .. currentClass.extends .. ". Polyinheritance is not supported." )
+					end
+					currentClass.extends = demandImmediateNextName()
+				elseif NON_CLASS_TYPE_DECLARATION_KEYWORDS[keyword] then
+					isClassDefinition = false
+					stepBack( keyword )
+				else
+					parserError( "unexpected keyword '" .. tostring(keyword) .. "', expected class type declaration (extends, implements, etc.) or property/function declaration." )
+				end
+			else
+				local keyword = demandNextName( "property or function declaration or 'end'" )
+				if isStatic and not STATIC_KEYWORDS[keyword] then
+					parserError( "invalid keyword '" .. keyword .. "' after 'static'" )
+				end
+				if keyword == KEYWORD_END then
+					blockLevel = BLOCK_LEVEL_NONE
+					-- TODO: public the currentClass
+					parsed[currentClass.className] = currentClass
+				elseif keyword == KEYWORD_STATIC then
+					isStatic = true
+				elseif keyword == KEYWORD_LOCAL then
+					local name = demandImmediateNextName( "instance variable name" )
+
 					if isStatic then
-						currentClass.static.defaultValues[name] = expression
+						if currentClass.static.instanceVariables[name] then
+							parserError( "duplicate static instance variable for name '" .. name .. "'" )
+						end
 					else
-						currentClass.instance.defaultValues[name] = expression
-					end
-				else
-					parserError( "default expects equals sign and new default value after property name" )
-				end
-			elseif keyword == KEYWORD_SET or keyword == KEYWORD_DIDSET or keyword == KEYWORD_WILLSET or keyword == KEYWORD_GET then
-				local name = demandImmediateNextName( "property name" )
-				local propertyTable
-				if isStatic then
-					propertyTable = currentClass.static.properties[name]
-				else
-					propertyTable = currentClass.instance.properties[name]
-				end
-				if not propertyTable then
-					parserError( "Attempted to define getter/setter for undefined property '" .. name .. "'. Property definitions must be before getter/setter declarations." )
-				elseif propertyTable[keyword] then
-					parserError( "Attempted to redefine '" .. keyword .. "' for property '" .. name .. "'." )
-				end
-				captureSingleParameter( keyword == KEYWORD_GET and "" or name )
-
-				local block, startLine = captureBlock()
-				propertyTable[keyword] = { "function(self" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) ..")" .. block, startLine }
-			elseif keyword == KEYWORD_EVENT then
-				local name = demandImmediateNextName( "event function handle name" )
-				local eventClass, eventPhase, parameterName = captureEventParameter()
-				local block, startLine = captureBlock()
-				local eventTable = { "function(self," .. parameterName ..")" .. block, startLine, eventClass, eventPhase }
-				if isStatic then
-					currentClass.static.eventHandles[name] = eventTable
-				else
-					currentClass.instance.eventHandles[name] = eventTable
-				end
-			elseif keyword == KEYWORD_FUNCTION then
-				local returnTypes = {}
-				local currentReturnType
-				local hasNext = false
-				local name
-				-- capture the return types
-				repeat
-					local nextKeyword = immediateNextName( "return type modifiers (readOnly, allowsNil, etc.) or function name" )
-					if not nextKeyword then
-						-- no return type was given, hence we allow ANY return value and any amount of return values. If you don't want to return anything use nil
-						local returnTypesCount = #returnTypes
-						if currentReturnType then
-							-- the current return type is actually the function name
-							name = currentReturnType.type
-							break
-						else
-							-- no function name was given
-							parserError("expected function name")
-						end
-					elseif nextKeyword == KEYWORD_ALLOWSNIL then
-						if not currentReturnType then
-							parserError( "expected return type before 'allowsNil' modifier" )
-						end
-						currentReturnType.allowsNil = true
-						-- we can't modify the property any further, add the return type to the stack
-						table.insert( returnTypes, currentReturnType )
-						currentReturnType = nil
-					elseif currentReturnType then
-						-- nextKeyword is actually the function name, add the return type to the stack
-						name = nextKeyword
-						table.insert( returnTypes, currentReturnType )
-						currentReturnType = nil
-					else
-						currentReturnType = { type = nextKeyword, allowsNil = false }
-					end
-
-					hasNext = isNext( "^%s*%,", true )
-					if hasNext and name then
-						parserError( "invalid return type modifier '" .. name .. "'" )
-					end
-				until not currentReturnType and not hasNext
-
-				if not name then
-					name = demandImmediateNextName( "event function handle name" )
-				end
-
-				local functionTable = { false --[[ simply a placeholder to be once the block can be captured ]] }
-
-				-- capture the parameters
-				local parameters = {}
-				hasOpeningBracket = isNext( "^%s*%(%s*", true )
-				if not hasOpeningBracket then
-					parserError( "expected opening bracket for function parameters" )
-				end
-				repeat
-					local allowsNil, name = false
-					-- first we try to capture the type, however, this may also be the name. this is needed because the type isn't always a keyword (for tabes and dictionary types)
-					local parameterType, parameterIsTable = nextType()
-					while true do
-						local nextKeyword = immediateNextName()
-						if not nextKeyword then
-							if parameterType then
-								if parameterIsTable then
-									parserError( "expected modifier (" .. KEYWORD_ALLOWSNIL .. ") or property name" )
-								else
-									-- a type wasn't given, we'll allow anything (including nil)
-									name = parameterType
-									parameterType = nil
-									allowsNil = true
-									break
-								end
-							else
-								parserError( "expected parameter type, modifier (" .. KEYWORD_ALLOWSNIL .. ") or property name" )
-							end
-						elseif nextKeyword == KEYWORD_ALLOWSNIL then
-							if not parameterType then
-								parserError( "expected parameter type before modifier '" .. nextKeyword .. "'" )
-							end
-							allowsNil = true
-						elseif not parameterType then
-							parameterType = nextKeyword
-						else
-							name = nextKeyword
-							break
+						if currentClass.instance.instanceVariables[name] then
+							parserError( "duplicate instance variable for name '" .. name .. "'" )
 						end
 					end
+
 					-- try and get the default value out of it
 					local hasEquals = isNext( "^(%s*)=(%s*)", true )
 					local defaultValue
 					if hasEquals then
-						defaultValue = captureParameterDefault()
+						defaultValue = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
 					end
 
-					table.insert(parameters, {
+					if isStatic then
+						currentClass.static.instanceVariables[name] = defaultValue
+					else
+						currentClass.instance.instanceVariables[name] = defaultValue
+					end
+				elseif keyword == KEYWORD_ENUM then
+					local propertyType = demandNextType( "enum type" )
+					local name = demandImmediateNextName( "enum name" )
+
+					if currentClass.enums[name] then
+						parserError( "duplicate enum for name '" .. name .. "'" )
+					end
+
+					-- try and get the default value out of it
+					local hasEquals = isNext( "^(%s*)=(%s*)", true )
+					local values
+					if hasEquals then
+						values = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
+					else
+						parserError( "expected table of enum values" )
+					end
+
+					currentClass.enums[name] = {
+						type = propertyType,
+						values = values
+					}
+				elseif keyword == KEYWORD_PROPERTY then
+					local propertyType = demandNextType( "property type" )
+					local readOnly, allowsNil, link, name = false, false, false
+					repeat
+						local nextKeyword = demandImmediateNextName( "property type modifiers (readOnly, allowsNil, etc.) or property name" )
+						if nextKeyword == KEYWORD_READONLY then
+							readOnly = true
+						elseif nextKeyword == KEYWORD_ALLOWSNIL then
+							allowsNil = true
+						elseif nextKeyword == KEYWORD_LINK then
+							link = true
+						else
+							name = nextKeyword
+						end
+					until name
+
+					if isStatic then
+						if currentClass.static.properties[name] then
+							parserError( "duplicate static property for name '" .. name .. "'" )
+						end
+					else
+						if currentClass.instance.properties[name] then
+							parserError( "duplicate property for name '" .. name .. "'" )
+						end
+					end
+
+					-- try and get the default value out of it
+					local hasEquals = isNext( "^(%s*)=(%s*)", true )
+					local defaultValue
+					if hasEquals then
+						defaultValue = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
+					end
+
+					local propertyTable = {
+						type = propertyType,
 						allowsNil = allowsNil,
-						type = parameterType,
-						name = name,
+						readOnly = readOnly,
+						link = link,
 						defaultValue = defaultValue
-					})
-					hasNext = isNext( "^%s*%,", true )
-				until not hasNext
+					}
+					if isStatic then
+						currentClass.static.properties[name] = propertyTable
+					else
+						currentClass.instance.properties[name] = propertyTable
+					end
+				elseif keyword == KEYWORD_DEFAULT then
+					local name = demandImmediateNextName( "property name" )
+					local hasEquals = isNext( "^(%s*)=(%s*)", true )
+					if hasEquals then
+						local expression = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
+						if isStatic then
+							currentClass.static.defaultValues[name] = expression
+						else
+							currentClass.instance.defaultValues[name] = expression
+						end
+					else
+						parserError( "default expects equals sign and new default value after property name" )
+					end
+				elseif keyword == KEYWORD_SET or keyword == KEYWORD_DIDSET or keyword == KEYWORD_WILLSET or keyword == KEYWORD_GET then
+					local name = demandImmediateNextName( "property name" )
+					local propertyTable
+					if isStatic then
+						propertyTable = currentClass.static.properties[name]
+					else
+						propertyTable = currentClass.instance.properties[name]
+					end
+					if not propertyTable then
+						parserError( "Attempted to define getter/setter for undefined property '" .. name .. "'. Property definitions must be before getter/setter declarations." )
+					elseif propertyTable[keyword] then
+						parserError( "Attempted to redefine '" .. keyword .. "' for property '" .. name .. "'." )
+					end
+					captureSingleParameter( keyword == KEYWORD_GET and "" or name )
 
-				local block, startLine = captureBlock()
-				local functionString = "function(self,"
-				local parametersCount = #parameters
-				for i, parameter in ipairs( parameters ) do
-					functionString = functionString .. parameter.name .. (i ~= parametersCount and "," or "")
-				end
-				local functionTable = { functionString .. block, startLine, parameters, returnTypes }
-				if isStatic then
-					currentClass.static.functions[name] = functionTable
+					local block, startLine = captureBlock()
+					propertyTable[keyword] = { "(self" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) ..")" .. block, startLine }
+				elseif keyword == KEYWORD_EVENT then
+					local name = demandImmediateNextName( "event function handle name" )
+					local eventClass, eventPhase, parameterName = captureEventParameter()
+					local block, startLine = captureBlock()
+					local eventTable = { "(self," .. parameterName ..")" .. block, startLine, eventClass, eventPhase }
+					if isStatic then
+						currentClass.static.eventHandles[name] = eventTable
+					else
+						currentClass.instance.eventHandles[name] = eventTable
+					end
+				elseif keyword == KEYWORD_FUNCTION then
+					local returnTypes = {}
+					local currentReturnType
+					local hasNext = false
+					local name
+					-- capture the return types
+					repeat
+						local nextKeyword = nextType( "return type modifiers (readOnly, allowsNil, etc.) or function name" )
+						if not nextKeyword then
+							-- no return type was given, hence we allow ANY return value and any amount of return values. If you don't want to return anything use nil
+							local returnTypesCount = #returnTypes
+							if currentReturnType then
+								-- the current return type is actually the function name
+								name = currentReturnType.type
+								break
+							else
+								-- no function name was given
+								parserError("expected function name")
+							end
+						elseif nextKeyword == KEYWORD_ALLOWSNIL then
+							if not currentReturnType then
+								parserError( "expected return type before 'allowsNil' modifier" )
+							end
+							currentReturnType.allowsNil = true
+							-- we can't modify the property any further, add the return type to the stack
+							table.insert( returnTypes, currentReturnType )
+							currentReturnType = nil
+						elseif currentReturnType then
+							-- nextKeyword is actually the function name, add the return type to the stack
+							name = nextKeyword
+							table.insert( returnTypes, currentReturnType )
+							currentReturnType = nil
+						else
+							currentReturnType = { type = nextKeyword, allowsNil = false }
+						end
+
+						hasNext = isNext( "^%s*%,", true )
+						if hasNext and name then
+							parserError( "invalid return type modifier '" .. name .. "'" )
+						end
+					until not currentReturnType and not hasNext
+
+					if not name then
+						name = demandImmediateNextName( "event function handle name" )
+					end
+
+					local functionTable = { false --[[ simply a placeholder to be once the block can be captured ]] }
+
+					-- capture the parameters
+					local parameters = {}
+					hasOpeningBracket = isNext( "^%s*%(%s*", true )
+					if not hasOpeningBracket then
+						parserError( "expected opening bracket for function parameters" )
+					end
+					repeat
+						local allowsNil, parameterName = false
+						-- first we try to capture the type, however, this may also be the name. this is needed because the type isn't always a keyword (for tabes and dictionary types)
+						local parameterType, parameterIsTable = nextType()
+						if not parameterType then
+							break
+						end
+						while true do
+							local nextKeyword = immediateNextName()
+							if not nextKeyword then
+								if parameterType then
+									if parameterIsTable then
+										parserError( "expected modifier (" .. KEYWORD_ALLOWSNIL .. ") or property name" )
+									else
+										-- a type wasn't given, we'll allow anything (including nil)
+										parameterName = parameterType
+										parameterType = nil
+										allowsNil = true
+										break
+									end
+								else
+									parserError( "expected parameter type, modifier (" .. KEYWORD_ALLOWSNIL .. ") or property name" )
+								end
+							elseif nextKeyword == KEYWORD_ALLOWSNIL then
+								if not parameterType then
+									parserError( "expected parameter type before modifier '" .. nextKeyword .. "'" )
+								end
+								allowsNil = true
+							elseif not parameterType then
+								parameterType = nextKeyword
+							else
+								parameterName = nextKeyword
+								break
+							end
+						end
+						-- try and get the default value out of it
+						local hasEquals = isNext( "^(%s*)=(%s*)", true )
+						local defaultValue
+						if hasEquals then
+							defaultValue = captureParameterDefault()
+						end
+
+						table.insert(parameters, {
+							allowsNil = allowsNil,
+							type = parameterType,
+							name = parameterName,
+							defaultValue = defaultValue
+						})
+						hasNext = isNext( "^%s*%,", true )
+					until not hasNext
+
+					local block, startLine = captureBlock()
+					local functionString = "(self,"
+					local parametersCount = #parameters
+					for i, parameter in ipairs( parameters ) do
+						functionString = functionString .. parameter.name .. (i ~= parametersCount and "," or "")
+					end
+					local functionTable = { functionString .. block, startLine, parameters, returnTypes }
+					if isStatic then
+						currentClass.static.functions[name] = functionTable
+					else
+						currentClass.instance.functions[name] = functionTable
+					end
 				else
-					currentClass.instance.functions[name] = functionTable
+					-- break
+					parserError( "unexpected keyword '" .. tostring(keyword) .. "', expected property/function declaration or 'end'." )
 				end
-			else
-				-- break
-				parserError( "unexpected keyword '" .. tostring(keyword) .. "', expected property/function declaration or 'end'." )
-			end
 
-			if isStatic and keyword == KEYWORD_STATIC then
-				isStatic = false
+				if isStatic and keyword ~= KEYWORD_STATIC then
+					isStatic = false
+				end
 			end
 		end
 	end
+	print( "Parsed '" .. fileName .. "' without error in " .. os.clock() - fileStartTime .. "s!" )
 end
 
 local h = io.open("Parsed", "w")
-h:write(serialise(currentClass))
+h:write(serialise(parsed) .. serialise(fileEnvironments))
 h:close()
 print("Parsed in " .. os.clock() - startTime .. "s!")
+return parsed, fileEnvironments
