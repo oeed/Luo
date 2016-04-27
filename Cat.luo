@@ -1,5 +1,5 @@
 local CONST_VARIABLE = "THING"
-local window = AlertWindow()
+--local window = AlertWindow()
 
 class Cat
 

@@ -44,6 +44,11 @@ end
 
 -- first add all the built in functions
 
+-- local lineNumberMap = {}
+-- local function addLineNumber(funcID, file, startLine)
+-- 	insert(lineNumberMap
+-- end
+
 local functionErrorID = addFunction([[(m)error(m,3)end]])
 
 local functionErrorIDs = {
@@ -55,6 +60,9 @@ local functionErrorIDs = {
 		instance = {
 			index = addFunction([[(_,k)%s("attempted to access non-existant property '"..tostring(_).."' enum '"..k.."'")end]], functionErrorID),
 			newindex = addFunction([[(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
+		},
+		func = {
+			newindex = addFunction([[(_,k,v)%s("attempted to set value of function '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
 		},
 		enum = {
 			index = addFunction([[(_,k)%s("attempted to access non-existant key '"..k.."' from enum '"..tostring(_).."'")end]], functionErrorID),
@@ -83,7 +91,10 @@ local functionErrorProxyID = addFunction([[(name, startLine, func)
 	return select(2, xpcall(func,  function(err)
 		local _, trace = pcall(error, "<@", 3)
 		local lineNumber = trace:match(":(%%d+): <@")
-		print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+		if not lineNumber then print(err)
+		else
+			print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+		end
 	end))
 end]])
 
@@ -97,19 +108,58 @@ for i, blocks in ipairs(fileEnvironments) do
 	add("local %s=setmetatable({},{__index=_G})", id)
 end
 
+-- figure out the order that the classes need to be loaded (supers first)
+local classOrder = {}
+local orderedClasses = {}
+local function addClassOrder(className, classDetails)
+	-- don't add a class that's already loaded
+	if not orderedClasses[className] then
+		-- if the class has a super we need to place this AFTER the super
+		if classDetails.extends then
+			if not orderedClasses[classDetails.extends] then
+				-- the super hasn't been added yet, do that now
+				addClassOrder(classDetails.extends, parsed[classDetails.extends])
+			end
+		end
+		-- the super has been added to the list or there isn't one, we can simply add ourself to the end
+		insert(classOrder, classDetails)
+		orderedClasses[className] = true
+	end
+end
+for className, classDetails in pairs(parsed) do
+	addClassOrder(className, classDetails)
+end
+
 -- now create empty tables for all the classes and their statics (which are filled later on) so we can reference them directly when needed
 local classStaticIDs = {}
+local classTostringIDs = {}
 for className, _ in pairs(parsed) do
 	-- TODO: maybe add an option which makes these locals?
 	add("%s={}", className)
+	local tostringID = nextID()
+	add("local %s=\"class '%s': \"..tostring(%s):sub(8)", tostringID, className, className)
+	classTostringIDs[className] = tostringID
 	local staticID = nextID()
 	classStaticIDs[className] = staticID
 	add("local %s={}", staticID)
 end
 
+-- the blank __index and __newindex functions for properties
+local functionBlankIndexID = nextID()
+add("local function %s(_,k,v)return v[k] end ", functionBlankIndexID)
+local functionBlankNewindexID = nextID()
+add("local function %s(_,k,n,v)v[k]=n end ", functionBlankNewindexID)
+
+local classMetatableMetatableID = nextID()
+add("local %s={__index=%s,__newindex=%s}", classMetatableMetatableID, functionErrorIDs.metatable.class.index, functionErrorIDs.metatable.class.newindex)
+local instanceMetatableMetatableID = nextID()
+add("local %s={__index=%s,__newindex=%s}", instanceMetatableMetatableID, functionErrorIDs.metatable.instance.index, functionErrorIDs.metatable.instance.newindex)
+
 -- now create each class one by one
-for className, classDetails in pairs(parsed) do
+for i, classDetails in pairs(classOrder) do
 	-- create the tree of super details
+	local className = classDetails.className
+	print("Loading class: " .. className)
 	local supersDetails = {classDetails}
 	local nextSuperName = classDetails.extends
 	local previousSuperName = className
@@ -125,23 +175,36 @@ for className, classDetails in pairs(parsed) do
 
 	-- create the enums
 	local enumIDs = {}
+	local enumTostringIDs = {}
 	local enumTypeCheckIDs = {}
 	for enumName, content in pairs(classDetails.enums) do
 		-- create enum's value table
 		local enumID = nextID()
 		enumIDs[enumName] = enumID
+		local enumTostringID = nextID()
+		enumTostringIDs[enumName] = enumTostringID
 		add("local %s=%s", enumID, content.values)
+		add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
 		-- create the type checking function
 		-- TODO: enum type check function
 		-- local enumTypeCheckID = nextID()
 		-- add("__CLASS__")
 	end
 
-	local defaultValueIDs = {}
+	-- add the class' value table
+	local valueTableId = nextID()
+	local valueTableString = "local %s=setmetatable({static=%s"
+	for enumName, id in pairs(enumIDs) do
+		local tostringID = enumTostringIDs[enumName]
+		valueTableString = valueTableString .. string.format(",%s=setmetatable(%s,{__index=%s,__newindex=%s,__tostring=function()return %s end})", enumName, id, functionErrorIDs.metatable.enum.index, functionErrorIDs.metatable.enum.newindex, tostringID)
+	end
+	add(valueTableString .. "},%s)", valueTableId, classStaticIDs[className], classMetatableMetatableID)
+
+	local staticInitialiseStrings = {}
 	-- setup the instance and static values and functions
-	for mode, details in pairs({instance = classDetails.instance, static = classDetails.static}) do
+	for mode, modeDetails in pairs({instance = classDetails.instance, static = classDetails.static}) do
 		-- create the detault values
-		defaultValuesID = nextID()
+		local defaultValuesID = nextID()
 		-- we need to collate all the places where default values are set and flatten it in to one table
 		local flattenedDefaultValues = {}
 		for i, superAllDetails in ipairs(supersDetails) do
@@ -161,19 +224,235 @@ for className, classDetails in pairs(parsed) do
 				end
 			end
 		end
-
 		add("local %s={", defaultValuesID)
 		for propertyName, defaultValue in pairs(flattenedDefaultValues) do
-			add("[%q]=loadstring([[return %s]]),", propertyName, escapeSquare(defaultValue))
+			add("[%q]=loadstring(%q),", propertyName, "return " .. defaultValue)
 		end
 		add("}")
 
-		-- local functionIDs = {}
-		-- for k, v in pairs(table_name) do
-		-- 	-- Code here...
-		-- end
-	end
+		-- add the functions
+		local functionIDs = {}
+		local functionsTable = "local %s={"
+		local didAdd = false
+		for functionName, functionDetails in pairs(modeDetails.functions) do
+			-- add the actual function code
+			local functionID = nextID()
+			add("local function %s(self,super)return function%s end ", functionID, functionDetails[1])
+			functionIDs[functionName] = functionID
 
+			-- create the functions table (the list of the function and all its supers)
+			local functionsTableString = string.format("[%q]={%s", functionName, functionID)
+			local isConsecutive = true
+			for i, superDetails in ipairs(supersDetails) do
+				if i ~= 1 then
+					local superFunctionID = superDetails[mode].functionIDs[functionName]
+					if superFunctionID then
+						-- this super class has another version of the same function
+						if isConsecutive then
+							functionsTableString = functionsTableString .. string.format(",%s", superFunctionID)
+						else
+							functionsTableString = functionsTableString .. string.format(",[%d]=%s", i, superFunctionID)
+						end
+					else
+						isConsecutive = false
+					end
+				end
+			end
+			functionsTable = functionsTable .. functionsTableString .. "},"
+			didAdd = true
+		end
+		local functionsTableID
+		if didAdd then
+			functionsTableID = nextID()
+			add(functionsTable:sub(1,#functionsTable - 1) .. "}", functionsTableID)
+		end
+		classDetails[mode].functionIDs = functionIDs
+
+		-- add the properties
+		-- start the index metatable
+		local propertyMethodIDs = {}
+		-- as with default values, we need to collate all the places where properties are defined and flatten it in to one table
+		local flattenedProperties = {}
+		local flattenedPropertyMethods = {}
+		for i = #supersDetails, 1, -1 do
+			-- we need to go backwards because properties should only be defined ONCE (i.e. if it tries to override then error)
+			local superDetails = supersDetails[i][mode]
+			for propertyName, propertyDetails in pairs(superDetails.properties) do
+				-- then try to get the default from the property definitions
+				if flattenedProperties[propertyName] then
+					error("compiler error: attempted to redeclare " .. mode .. " property '" .. propertyName .. " in " .. className .. " which was already defined by super class '" .. supersDetails[i].className .. "'. Subclasses are not allowed to change or redeclare properties defined by a super class.")
+				else
+					flattenedProperties[propertyName] = propertyDetails
+				end
+			end
+
+			-- flatten all the property methods
+			for methodName, methodDetails in pairs(superDetails.propertyMethods) do
+				for propertyName, content in pairs(methodDetails) do
+					if not flattenedPropertyMethods[propertyName] then
+						flattenedPropertyMethods[propertyName] = {}
+					end
+					if not flattenedPropertyMethods[propertyName][methodName] then
+						flattenedPropertyMethods[propertyName][methodName] = {[i] = content}
+					else
+						flattenedPropertyMethods[propertyName][methodName][i] = content
+					end
+				end
+			end
+		end
+
+		-- add all the property method function code
+		local propertyMethodIDs = {}
+		for methodName, methods in pairs(classDetails[mode].propertyMethods) do
+			for propertyName, methodDetails in pairs(methods) do
+				if not propertyMethodIDs[propertyName] then
+					propertyMethodIDs[propertyName] = {}
+				end
+				if methodName then
+					local methodID = nextID()
+					add("local function %s(self,super)return function%s end ", methodID, methodDetails[1])
+					propertyMethodIDs[propertyName][methodName] = methodID
+				end
+			end
+		end
+		classDetails[mode].propertyMethodIDs = propertyMethodIDs
+
+		-- create the super tree tables for all the property methods
+		-- local propertyMethodsTableIDs = {}
+		local flattenedPropertyMethodIDs = {}
+		for propertyName, properties in pairs(flattenedPropertyMethods) do
+			flattenedPropertyMethodIDs[propertyName] = {}
+			for methodName, methods in pairs(properties) do
+
+				local lastI = 0
+				local didAddInner = false
+				for superI, methodDetails in pairs(methods) do
+					local superMethodID = supersDetails[superI][mode].propertyMethodIDs[propertyName]
+					if superMethodID then
+						superMethodID = superMethodID[methodName]
+					end
+					if superMethodID then
+						if not flattenedPropertyMethodIDs[propertyName][methodName] then
+							flattenedPropertyMethodIDs[propertyName][methodName] = superMethodID
+						end
+					end
+				end
+			end
+		end
+
+
+		-- create the instance __index & __newindex methods for accessing properties and functions
+		local instanceIndexTableID
+		local instanceIndexTable = "local %s=setmetatable({"
+		local instanceNewindexTableID
+		local instanceNewindexTable = "local %s=setmetatable({"
+		local didAdd = false
+		for propertyName, propertyDetails in pairs(flattenedProperties) do
+			local propertyMethods = flattenedPropertyMethods[propertyName]
+			-- add the index method
+			if propertyMethods and propertyMethods.get then
+				-- there is a custom index property method
+				instanceIndexTable = instanceIndexTable .. string.format("[%q]=function(_,k,v,e,l)", propertyName)
+				instanceIndexTable = instanceIndexTable .. "if l[k]then return v[k]else l[k]=true "
+				instanceIndexTable = instanceIndexTable .. string.format("local v=%s(%s,e,_)l[k]=nil return v end end,", functionExecuteID, flattenedPropertyMethodIDs[propertyName].get)
+			else
+				-- there aren't any methods, we just need to return the value
+				instanceIndexTable = instanceIndexTable .. string.format("[%q]=%s,", propertyName, functionBlankIndexID)
+			end
+
+			if propertyDetails.readOnly then
+				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionErrorIDs.readOnly)
+			elseif propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
+				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,e,l)", propertyName)
+				-- TODO: add value checking
+				--[[
+					if __CLASS__type_check_String(value) then
+						__CLASS__error_type_instance_property(self, key, "String", value)
+					end
+				]]
+				instanceNewindexTable = instanceNewindexTable .. "if l[k]then v[k]=n else l[k]=true "
+				if propertyMethods.willSet then
+					instanceNewindexTable = instanceNewindexTable .. string.format("%s(%s,e,_,n)", functionExecuteID, flattenedPropertyMethodIDs[propertyName].willSet)
+				end
+				if propertyMethods.set then
+					instanceNewindexTable = instanceNewindexTable .. string.format("%s(%s,e,_,n)", functionExecuteID, flattenedPropertyMethodIDs[propertyName].set)
+				else
+					instanceNewindexTable = instanceNewindexTable .. "v[k]=n "
+				end
+				if propertyMethods.didSet then
+					instanceNewindexTable = instanceNewindexTable .. string.format("%s(%s,e,_,n)", functionExecuteID, flattenedPropertyMethodIDs[propertyName].didSet)
+				end
+				instanceNewindexTable = instanceNewindexTable .. "l[k]=nil end end,"
+			else
+				-- there aren't any methods, we just need to set the value
+				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionBlankNewindexID)
+			end
+			didAdd = true
+		end
+		-- add the functions to the tables
+		for functionName, functionDetails in pairs(functionIDs) do
+			instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", functionName, functionErrorIDs.metatable.func.newindex)
+			instanceIndexTable = instanceIndexTable .. string.format("[%q]=%s,", functionName, functionBlankIndexID)
+		end
+		if didAdd then
+			instanceIndexTableID = nextID()
+			instanceNewindexTableID = nextID()
+			add(instanceIndexTable:sub(1,#instanceIndexTable - 1) .. "},%s)", instanceIndexTableID, instanceMetatableMetatableID)
+			add(instanceNewindexTable:sub(1,#instanceNewindexTable - 1) .. "},%s)", instanceNewindexTableID, instanceMetatableMetatableID)
+		else
+			instanceIndexTableID, instanceNewindexTableID = instanceMetatableMetatableID, instanceMetatableMetatableID
+		end
+
+		-- add the instance variables
+		local instanceVariablesID
+		local instanceVariablesString = "local %s={"
+		didAdd = false
+		for variableName, content in pairs(classDetails[mode].instanceVariables) do
+			instanceVariablesString = instanceVariablesString .. string.format("[%q]=loadstring([[return %s]]),", variableName, escapeSquare(content))
+			didAdd = true
+		end
+		if didAdd then
+			instanceVariablesID = nextID()
+			add(instanceVariablesString:sub(1,#instanceVariablesString - 1) .. "}", instanceVariablesID)
+		end
+
+		-- create the typeof tree and the list of supers
+		local typeOfTreeString = "local %s={"
+		local superNamesID
+		local superNamesString = "local %s={"
+		didAdd = false
+		-- add the base classes & static instance
+		for i, superDetails in ipairs(supersDetails) do
+			local superName = superDetails.className
+			typeOfTreeString = typeOfTreeString .. string.format("[%s]=1,", superName)
+			if mode == "static" then
+				-- add the static instances
+				typeOfTreeString = typeOfTreeString .. string.format("[%s]=1,", classStaticIDs[superName])
+			end
+			if i ~= 1 then
+				superNamesString = superNamesString .. string.format("%q,", superName)
+				didAdd = true
+			end
+		end
+		local typeOfTreeID = nextID()
+		add(typeOfTreeString:sub(1,#typeOfTreeString - 1) .. "}", typeOfTreeID)
+		if didAdd then
+			superNamesID = nextID()
+			add(superNamesString:sub(1,#superNamesString - 1) .. "}", superNamesID)
+		end
+
+		-- add the class metatable
+		if mode == "instance" then
+			add("setmetatable(%s,{__index=%s,__newindex=%s,", className, valueTableId, functionErrorIDs.metatable.class.newindex)
+			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValueIDs, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID)
+			add("__tostring=function()return %s end})", classTostringIDs[className])
+		elseif mode == "static" then
+			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValueIDs, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID})
+		end
+	end
+	for i, str in ipairs(staticInitialiseStrings) do
+		add(unpack(str))
+	end
 end
 
 -- run the other code in the files inside their environments

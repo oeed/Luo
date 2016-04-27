@@ -6,7 +6,7 @@ class AlertWindow extends Window
 	static local aStaticInstanceVariable = "starting value"
 
 	property String thing = "this is a default value"
-	default aNumber = 0x10c + 20 -- change the default value of a super
+	-- default aNumber = 0x10c + 20 -- change the default value of a super
 	default aBoolean = true -- change the default value of a super
 	default aString = "hello there" .. " concated!" -- change the default value of a super
 	.. "oh but there's more!"
@@ -28,16 +28,19 @@ class AlertWindow extends Window
 
 	static property String thingy -- static must be the first keyword
 
+	set aBoolean( aBoolean )
+		self.aBoolean = not aBoolean
+	end
+
 	set thing( thing )
 		-- a setter. here you must manually set the value yourself (i.e. if you don't change it it will stay as-is)
-		name = string.upper( name )
-		self.name = name
+		thing = string.upper( thing )
+		self.thing = thing
 	end
 
 	get thing()
-		-- a setter. here you must manually set the value yourself (i.e. if you don't change it it will stay as-is)
-		name = string.upper( name )
-		self.name = name
+		-- a getter. here you must manually set the value yourself (i.e. if you don't change it it will stay as-is)
+		return self.thing
 	end
 
 	didSet thing( thing )
@@ -71,18 +74,43 @@ class AlertWindow extends Window
 	end
 
 	function initialise(arg1, arg2)
-		
+		print("ALIVE")
+		print(self)
+		print(super)
 	end
 
 end
 
 local otherStuff = 5
 
-class Window
-	
+class Window extends View
+
 	property Number aNumber
-	property Boolean aBoolean
-	property String aString
+	default aBoolean = false
+	property String aString = "wow"
 	property Cat animal
+
+	function capitaliseAndLocation()
+		print("window shit")
+	end
+
+end
+
+class View
+	
+	property String size
+	property Boolean aBoolean = true
+
+	function capitaliseAndLocation()
+		print("view shit")
+	end
+
+	set aBoolean( aBoolean )
+		self.aBoolean = true
+	end
+
+	function initialise()
+		print("window shit")
+	end
 
 end

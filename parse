@@ -1,5 +1,6 @@
 -- TODO: do semi-colons work??
 -- TODO: prevent getters and setters on methods
+-- TODO: for some reason aNumber from Window isn't showing up in the parse
 
 local args = { ... }
 if #args == 0 then
@@ -596,6 +597,7 @@ for i, fileName in ipairs( args ) do
 					className = className,
 					instance = {
 						properties = {},
+						propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
 						defaultValues = {},
 						eventHandles = {},
 						functions = {},
@@ -603,6 +605,7 @@ for i, fileName in ipairs( args ) do
 					},
 					static = {
 						properties = {},
+						propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
 						defaultValues = {},
 						eventHandles = {},
 						functions = {},
@@ -754,21 +757,19 @@ for i, fileName in ipairs( args ) do
 					end
 				elseif keyword == KEYWORD_SET or keyword == KEYWORD_DIDSET or keyword == KEYWORD_WILLSET or keyword == KEYWORD_GET then
 					local name = demandImmediateNextName( "property name" )
-					local propertyTable
+					local propertyMethodTable
 					if isStatic then
-						propertyTable = currentClass.static.properties[name]
+						propertyMethodTable = currentClass.static.propertyMethods[keyword]
 					else
-						propertyTable = currentClass.instance.properties[name]
+						propertyMethodTable = currentClass.instance.propertyMethods[keyword]
 					end
-					if not propertyTable then
-						parserError( "Attempted to define getter/setter for undefined property '" .. name .. "'. Property definitions must be before getter/setter declarations." )
-					elseif propertyTable[keyword] then
+					if propertyMethodTable[name] then
 						parserError( "Attempted to redefine '" .. keyword .. "' for property '" .. name .. "'." )
 					end
 					captureSingleParameter( keyword == KEYWORD_GET and "" or name )
 
 					local block, startLine = captureBlock()
-					propertyTable[keyword] = { "(self" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) ..")" .. block, startLine }
+					propertyMethodTable[name] = { "(self" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) ..")" .. block, startLine }
 				elseif keyword == KEYWORD_EVENT then
 					local name = demandImmediateNextName( "event function handle name" )
 					local eventClass, eventPhase, parameterName = captureEventParameter()
@@ -885,10 +886,10 @@ for i, fileName in ipairs( args ) do
 					until not hasNext
 
 					local block, startLine = captureBlock()
-					local functionString = "(self,"
+					local functionString = "(self"
 					local parametersCount = #parameters
 					for i, parameter in ipairs( parameters ) do
-						functionString = functionString .. parameter.name .. (i ~= parametersCount and "," or "")
+						functionString = functionString  .. "," .. parameter.name-- .. (i ~= parametersCount and "," or "")
 					end
 					local functionTable = { functionString .. block, startLine, parameters, returnTypes }
 					if isStatic then
