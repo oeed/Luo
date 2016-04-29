@@ -1,0 +1,23 @@
+local predefined = function()
+	-- print("Hello")
+end
+
+local n = 10000000
+local start1 = os.clock()
+for i = 1, n do
+	predefined()
+end
+local total1 = os.clock() - start1
+
+local start2 = os.clock()
+for i = 1, n do
+	(function()
+		-- print("Hello")
+	end)()
+end
+local total2 = os.clock() - start2
+
+print("Total 1:" .. total1)
+print("Average 1:" .. total1 / n)
+print("Total 2:" .. total2)
+print("Average 2:" .. total2 / n)

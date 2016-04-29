@@ -1,0 +1,22 @@
+local str_check = function(v)
+return v ~= nil and type(v) == "string"
+end
+
+local v = 5435
+local n = 100000000
+local start1 = os.clock()
+for i = 1, n do
+	str_check(v)
+end
+local total1 = os.clock() - start1
+local start2 = os.clock()
+local e = {type=type}
+for i = 1, n do
+	setfenv(str_check, e)(v)
+end
+local total2 = os.clock() - start2
+
+print("Total 1:" .. total1)
+print("Average 1:" .. total1 / n)
+print("Total 2:" .. total2)
+print("Average 2:" .. total2 / n)
