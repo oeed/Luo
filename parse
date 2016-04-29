@@ -227,17 +227,29 @@ for i, fileName in ipairs( args ) do
 		if currentLinePosition <= currentLineLength then
 			local line = lines[currentLine]
 			if line then
-				return line:sub( currentLinePosition )
+				-- TODO: if comments/white space are needed return this: local sub = line:sub( currentLinePosition )
+				-- if the line is all comments or space then skip the line
+				local nonComments = ""
+				local lineComments = linesComments[currentLine]
+				for i = currentLinePosition, #line do
+					if not lineComments[i] then
+						nonComments = nonComments .. line:sub(i, i)
+					end
+				end
+				if not nonComments:match("^%s*$") then
+					return nonComments
+				end
 			end
+		end
+
+		-- otherwise...
+		currentLine = currentLine + 1
+		if currentLine > linesCount then
+			isEndOfFile = true
 		else
-			currentLine = currentLine + 1
-			if currentLine > linesCount then
-				isEndOfFile = true
-			else
-				currentLinePosition = LINE_START_POSITION
-				currentLineLength = #lines[currentLine]
-				return getLine()
-			end
+			currentLinePosition = LINE_START_POSITION
+			currentLineLength = #lines[currentLine]
+			return getLine()
 		end
 	end
 
