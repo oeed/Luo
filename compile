@@ -444,10 +444,10 @@ for i, classDetails in pairs(classOrder) do
 		-- add the class metatable
 		if mode == "instance" then
 			add("setmetatable(%s,{__index=%s,__newindex=%s,", className, valueTableId, functionErrorIDs.metatable.class.newindex)
-			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValueIDs, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID)
+			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID)
 			add("__tostring=function()return %s end})", classTostringIDs[className])
 		elseif mode == "static" then
-			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValueIDs, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID})
+			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID})
 		end
 	end
 	for i, str in ipairs(staticInitialiseStrings) do
