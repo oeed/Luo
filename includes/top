@@ -26,7 +26,6 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 	local values = {}
 	if defaultValues then
 		for k,v in pairs(defaultValues) do
-			print(__CLASS__E(v, environmentClass))
 			values[k] = __CLASS__E(v, environmentClass)
 		end
 	end
