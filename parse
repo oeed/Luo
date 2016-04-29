@@ -5,8 +5,9 @@
 local args = { ... }
 if #args == 0 then
 	args = {
-		"AlertWindow.luo",
-		"Cat.luo"
+		"Small.luo"
+		-- "AlertWindow.luo",
+		-- "Cat.luo"
 	}
 end
 
@@ -14,7 +15,7 @@ local startTime = os.clock()
 dofile("serialise")
 
 local LINE_START_POSITION = 1
-local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum"
+local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super"
 local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
 	[KEYWORD_PROPERTY] = true,
 	[KEYWORD_DEFAULT] = true,
@@ -842,7 +843,6 @@ for i, fileName in ipairs( args ) do
 							-- there wasn't a type/name given, try to capture varargs (...)
 							local isVarArg = isNext( "^%s*%.%.%.%s*%)", true )
 							if isVarArg then
-								print(serialise(parameters))
 								table.insert(parameters, {
 									isVarArg = true,
 									name = "..."
@@ -878,6 +878,9 @@ for i, fileName in ipairs( args ) do
 								parameterName = nextKeyword
 								break
 							end
+						end
+						if parameterName == "self" or parameterName == "super" then
+							parserError("attempted to use '" .. parameterName .. "' as a parameter name. " .. parameterName .. " is automatically passed and cannot be used for another parameter.")
 						end
 						-- try and get the default value out of it
 						local hasEquals = isNext( "^(%s*)=(%s*)", true )
