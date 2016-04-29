@@ -1,6 +1,6 @@
 local floor, insert = math.floor, table.insert
 
-local parsed, fileEnvironments = loadfile( "parse" )( "AlertWindow.luo", "Cat.luo" )
+local parsed, fileEnvironments = loadfile( "parse" )( "Small.luo" )
 print("Starting compile...")
 local file = ""
 
@@ -234,28 +234,34 @@ for i, classDetails in pairs(classOrder) do
 		local functionIDs = {}
 		local functionsTable = "local %s={"
 		local didAdd = false
+		local allFunctionNames = {} -- all of the function names defined by us and the supers
 		for functionName, functionDetails in pairs(modeDetails.functions) do
 			-- add the actual function code
 			local functionID = nextID()
 			add("local function %s(self,super)return function%s end ", functionID, functionDetails[1])
 			functionIDs[functionName] = functionID
-
+		end
+		classDetails[mode].functionIDs = functionIDs
+		for i, superDetails in ipairs(supersDetails) do
+			for functionName, id in pairs(superDetails[mode].functionIDs) do
+				allFunctionNames[functionName] = true
+			end
+		end
+		for functionName, _ in pairs(allFunctionNames) do
 			-- create the functions table (the list of the function and all its supers)
-			local functionsTableString = string.format("[%q]={%s", functionName, functionID)
+			local functionsTableString = string.format("[%q]={", functionName)
 			local isConsecutive = true
 			for i, superDetails in ipairs(supersDetails) do
-				if i ~= 1 then
-					local superFunctionID = superDetails[mode].functionIDs[functionName]
-					if superFunctionID then
-						-- this super class has another version of the same function
-						if isConsecutive then
-							functionsTableString = functionsTableString .. string.format(",%s", superFunctionID)
-						else
-							functionsTableString = functionsTableString .. string.format(",[%d]=%s", i, superFunctionID)
-						end
+				local superFunctionID = superDetails[mode].functionIDs[functionName]
+				if superFunctionID then
+					-- this super class has another version of the same function
+					if isConsecutive then
+						functionsTableString = functionsTableString .. string.format("%s,", superFunctionID)
 					else
-						isConsecutive = false
+						functionsTableString = functionsTableString .. string.format("[%d]=%s,", i, superFunctionID)
 					end
+				else
+					isConsecutive = false
 				end
 			end
 			functionsTable = functionsTable .. functionsTableString .. "},"
@@ -266,7 +272,6 @@ for i, classDetails in pairs(classOrder) do
 			functionsTableID = nextID()
 			add(functionsTable:sub(1,#functionsTable - 1) .. "}", functionsTableID)
 		end
-		classDetails[mode].functionIDs = functionIDs
 
 		-- add the properties
 		-- start the index metatable
@@ -318,7 +323,6 @@ for i, classDetails in pairs(classOrder) do
 		classDetails[mode].propertyMethodIDs = propertyMethodIDs
 
 		-- create the super tree tables for all the property methods
-		-- local propertyMethodsTableIDs = {}
 		local flattenedPropertyMethodIDs = {}
 		for propertyName, properties in pairs(flattenedPropertyMethods) do
 			flattenedPropertyMethodIDs[propertyName] = {}
@@ -390,7 +394,7 @@ for i, classDetails in pairs(classOrder) do
 			didAdd = true
 		end
 		-- add the functions to the tables
-		for functionName, functionDetails in pairs(functionIDs) do
+		for functionName, _ in pairs(allFunctionNames) do
 			instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", functionName, functionErrorIDs.metatable.func.newindex)
 			instanceIndexTable = instanceIndexTable .. string.format("[%q]=%s,", functionName, functionBlankIndexID)
 		end
