@@ -1,19 +1,6 @@
 dofile("serialise")
 
 local __CLASS__instance_create = function(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, typeOfTree, ...)
--- print("creating instance")
--- print("instance: " .. tostring(instance))
--- print("instanceType: " .. tostring(instanceType))
--- print("instanceVariables: " .. tostring(instanceVariables))
--- print("instanceFunctions: " .. tostring(instanceFunctions))
--- print("initialiseFunction: " .. tostring(initialiseFunction))
--- print("defaultValues: " .. tostring(defaultValues))
--- print("environmentClass: " .. tostring(environmentClass))
--- print("name: " .. tostring(name))
--- print("instance__index: " .. tostring(instance__index))
--- print("instance__newindex: " .. tostring(instance__newindex))
--- print("supers_names: " .. tostring(supers_names))
--- print("typeOfTree: " .. tostring(typeOfTree))
 	local instanceEnvironment
 	if instanceVariables then
 		instanceEnvironment = setmetatable({}, {
@@ -84,11 +71,13 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 			local superFuncs = {}
 			local stack = {}
 			local n = 1
+			local f
 			for superI, func in pairs(funcs) do
 				if not isFirst then
 					stack[n] = {superI, func}
 					n = n + 1
 				else
+					f = func
 					isFirst = false
 				end
 			end
@@ -111,7 +100,7 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 				end
 				superFuncs[i] = setmetatable({}, {__index = __index, __newindex = __CLASS__8, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
 			end
-			values[k] = setfenv(funcs[1](instance, superFuncs[1]), instanceEnvironment)
+			values[k] = setfenv(f(instance, superFuncs[1]), instanceEnvironment)
 		end
 	end
 
@@ -119,13 +108,9 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 		return typeOfTree[other] == 1
 	end
 
-	print("shoudl init here?")
-	print(initialiseFunction)
 	local initialiseFunction = values.initialise
 	if initialiseFunction then
-		print("yeah man")
 		initialiseFunction(instance, ...)
-		-- __CLASS__D(initialiseFunction, instanceEnvironment, instance, ...)
 	end
 	return instance
 end
