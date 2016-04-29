@@ -839,6 +839,16 @@ for i, fileName in ipairs( args ) do
 						-- first we try to capture the type, however, this may also be the name. this is needed because the type isn't always a keyword (for tabes and dictionary types)
 						local parameterType, parameterIsTable = nextType()
 						if not parameterType then
+							-- there wasn't a type/name given, try to capture varargs (...)
+							local isVarArg = isNext( "^%s*%.%.%.%s*%)", true )
+							if isVarArg then
+								print(serialise(parameters))
+								table.insert(parameters, {
+									isVarArg = true,
+									name = "..."
+								})
+								stepBack(")")
+							end
 							break
 						end
 						while true do
@@ -887,9 +897,8 @@ for i, fileName in ipairs( args ) do
 
 					local block, startLine = captureBlock()
 					local functionString = "(self"
-					local parametersCount = #parameters
 					for i, parameter in ipairs( parameters ) do
-						functionString = functionString  .. "," .. parameter.name-- .. (i ~= parametersCount and "," or "")
+						functionString = functionString  .. "," .. parameter.name
 					end
 					local functionTable = { functionString .. block, startLine, parameters, returnTypes }
 					if isStatic then
