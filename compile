@@ -311,6 +311,9 @@ for i, classDetails in pairs(classOrder) do
 		local propertyMethodIDs = {}
 		for methodName, methods in pairs(classDetails[mode].propertyMethods) do
 			for propertyName, methodDetails in pairs(methods) do
+				if not flattenedProperties[propertyName] then
+					error("compiler error: found property method '" .. methodName .. "' for undefined property '" .. propertyName .. "'!")
+				end
 				if not propertyMethodIDs[propertyName] then
 					propertyMethodIDs[propertyName] = {}
 				end
