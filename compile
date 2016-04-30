@@ -334,7 +334,8 @@ for i, classDetails in pairs(classOrder) do
 			for methodName, methodDetails in pairs(methods) do
 				local isConsecutive = true
 				for i, superDetails in ipairs(supersDetails) do
-					local superFunctionID = superDetails[mode].propertyMethodIDs[propertyName][methodName]
+					local superFunctionID = superDetails[mode].propertyMethodIDs[propertyName]
+					superFunctionID = superFunctionID and superFunctionID[methodName] -- only get the method if the super has any methods for that property name
 					if superFunctionID then
 						-- this super class has another version of the same function
 						if isConsecutive then
