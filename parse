@@ -660,7 +660,6 @@ for i, fileName in ipairs( args ) do
 				end
 				if keyword == KEYWORD_END then
 					blockLevel = BLOCK_LEVEL_NONE
-					-- TODO: public the currentClass
 					parsed[currentClass.className] = currentClass
 				elseif keyword == KEYWORD_STATIC then
 					isStatic = true
