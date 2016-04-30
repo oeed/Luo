@@ -1,0 +1,36 @@
+
+class Small
+	--this
+	property Boolean calledInitialise = false
+	property Number initialiseArgsCount
+	property String aSetter = "go away"
+	property String aGetter = "GO AWAY"
+
+	property String aDefault = "this is a default value"
+	property String aPlainValue = "hello"
+
+	set aSetter(aSetter)
+		self.aSetter = aSetter:upper()
+	end
+
+	get aGetter()
+		return self.aGetter:lower()
+	end
+
+	function initialise(...)
+		self.calledInitialise = true
+		self.initialiseArgsCount = #{...}
+	end
+
+end
+
+-- class Other 
+
+-- 	property String aSetter = "go away"
+
+-- 	get aSetter()
+-- 		print("super getter")
+-- 		return "d"
+-- 	end
+
+-- end

@@ -1,7 +1,48 @@
+local testCount = 0
+local testSuccesses = 0
+function testV(name, value, expected)
+	testCount = testCount + 1
+	if expected ~= value then
+		print("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected '" .. tostring(expected) .. "'")
+		return
+	end
+	print("Test Passed! ('" .. name .. "')")
+	testSuccesses = testSuccesses + 1
+	return value
+end
 
-local testFunc = [[return function( self, thing )
-	print("we start!")
-	print("doing stuff with " .. thing)
-end]]
-local loaded = loadstring( testFunc )()
-loaded()
+function testM(name, value, pattern)
+	testCount = testCount + 1
+	local match = {value:match(pattern)}
+	if #match == 0 then
+		print("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected to match pattern '" .. tostring(expected) .. "'")
+		return
+	end
+	print("Test Passed! ('" .. name .. "')")
+	testSuccesses = testSuccesses + 1
+	return unpack(match)
+end
+
+function testF(name, func, ...)
+	testCount = testCount + 1
+	local expected = {...}
+	local returned = {func()}
+	if #expected ~= #returned then
+		print("Test Failed ('" .. name .. "'): expected " .. #expected " return values, got " .. #returned)
+		return
+	else
+		for i, v in ipairs(returned) do
+			if v ~= expected[i] then
+				print("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(expected[i]) .. "'")
+				return
+			end
+		end
+	end
+	print("Test Passed! ('" .. name .. "')")
+	testSuccesses = testSuccesses + 1
+	return unpack(returned)
+end
+
+function testsDone()
+	print(string.format("%d/%d tests passed successfully (%.1f%%)", testSuccesses, testCount, (testSuccesses/testCount) * 100))
+end
