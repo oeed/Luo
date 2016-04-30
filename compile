@@ -1,3 +1,5 @@
+-- TODO: check that default values are the correct type and not nil after initialise
+
 local floor, insert = math.floor, table.insert
 
 local parsed, fileEnvironments = loadfile( "parse" )( "Small.luo" )
@@ -58,7 +60,7 @@ local functionErrorIDs = {
 			newindex = addFunction([[(_,k,v)%s("attempted to mutate class '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
 		},
 		instance = {
-			index = addFunction([[(_,k)%s("attempted to access non-existant property '"..tostring(_).."' enum '"..k.."'")end]], functionErrorID),
+			index = addFunction([[(_,k)%s("attempted to access non-existant property '"..k.."' of '"..tostring(_).."'")end]], functionErrorID),
 			newindex = addFunction([[(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
 		},
 		func = {
@@ -305,7 +307,6 @@ for i, classDetails in pairs(classOrder) do
 				end
 			end
 		end
-
 		-- add all the property method function code
 		local propertyMethodIDs = {}
 		for methodName, methods in pairs(classDetails[mode].propertyMethods) do
@@ -322,12 +323,52 @@ for i, classDetails in pairs(classOrder) do
 		end
 		classDetails[mode].propertyMethodIDs = propertyMethodIDs
 
+		-- create the super tree for property methods
+		local propertyMethodsTables = {get = "get={", didSet = "didSet={", willSet = "willSet={", set = "set={"}
+		local didAddTable = {get = false, didSet = false, willSet = false, set = false}
+		for propertyName, methods in pairs(flattenedPropertyMethods) do
+			propertyMethodsTableStrings = {get = string.format("[%q]={", propertyName), didSet = string.format("[%q]={", propertyName), willSet = string.format("[%q]={", propertyName), set = string.format("[%q]={", propertyName)}
+			for methodName, methodDetails in pairs(methods) do
+				local isConsecutive = true
+				for i, superDetails in ipairs(supersDetails) do
+					local superFunctionID = superDetails[mode].propertyMethodIDs[propertyName][methodName]
+					if superFunctionID then
+						-- this super class has another version of the same function
+						if isConsecutive then
+							propertyMethodsTableStrings[methodName] = propertyMethodsTableStrings[methodName] .. string.format("%s,", superFunctionID)
+						else
+							propertyMethodsTableStrings[methodName] = propertyMethodsTableStrings[methodName] .. string.format("[%d]=%s,", i, superFunctionID)
+						end
+					else
+						isConsecutive = false
+					end
+				end
+				propertyMethodsTables[methodName] = propertyMethodsTables[methodName] .. propertyMethodsTableStrings[methodName]:sub(1,#propertyMethodsTableStrings[methodName] - 1) .. "},"
+				didAddTable[methodName] = true
+			end
+		end
+		local propertyMethodsTable = "local %s={"
+		didAdd = false
+		for methodName, didAddMethod in pairs(didAddTable) do
+			if didAddMethod then
+				didAdd = true
+				propertyMethodsTable = propertyMethodsTable .. propertyMethodsTables[methodName]:sub(1,#propertyMethodsTables[methodName] - 1) .. "},"
+			end
+		end
+		local propertyMethodsTableID
+		if didAdd then
+			propertyMethodsTableID = nextID()
+			add(propertyMethodsTable:sub(1,#propertyMethodsTable - 1) .. "}", propertyMethodsTableID)
+		end
+
 		-- create the super tree tables for all the property methods
 		local flattenedPropertyMethodIDs = {}
+		local propertyMethodIndicies = {}
+		local index = 1
 		for propertyName, properties in pairs(flattenedPropertyMethods) do
 			flattenedPropertyMethodIDs[propertyName] = {}
+			propertyMethodIndicies[propertyName] = {}
 			for methodName, methods in pairs(properties) do
-
 				local lastI = 0
 				local didAddInner = false
 				for superI, methodDetails in pairs(methods) do
@@ -338,6 +379,7 @@ for i, classDetails in pairs(classOrder) do
 					if superMethodID then
 						if not flattenedPropertyMethodIDs[propertyName][methodName] then
 							flattenedPropertyMethodIDs[propertyName][methodName] = superMethodID
+							propertyMethodIndicies[superMethodID] = index
 						end
 					end
 				end
@@ -356,9 +398,9 @@ for i, classDetails in pairs(classOrder) do
 			-- add the index method
 			if propertyMethods and propertyMethods.get then
 				-- there is a custom index property method
-				instanceIndexTable = instanceIndexTable .. string.format("[%q]=function(_,k,v,e,l)", propertyName)
+				instanceIndexTable = instanceIndexTable .. string.format("[%q]=function(_,k,v,g,l)", propertyName)
 				instanceIndexTable = instanceIndexTable .. "if l[k]then return v[k]else l[k]=true "
-				instanceIndexTable = instanceIndexTable .. string.format("local v=%s(%s,e,_)l[k]=nil return v end end,", functionExecuteID, flattenedPropertyMethodIDs[propertyName].get)
+				instanceIndexTable = instanceIndexTable .. "local v=g[k](_)l[k]=nil return v end end,"
 			else
 				-- there aren't any methods, we just need to return the value
 				instanceIndexTable = instanceIndexTable .. string.format("[%q]=%s,", propertyName, functionBlankIndexID)
@@ -367,7 +409,7 @@ for i, classDetails in pairs(classOrder) do
 			if propertyDetails.readOnly then
 				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionErrorIDs.readOnly)
 			elseif propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
-				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,e,l)", propertyName)
+				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,w,s,d,l)", propertyName)
 				-- TODO: add value checking
 				--[[
 					if __CLASS__type_check_String(value) then
@@ -376,15 +418,15 @@ for i, classDetails in pairs(classOrder) do
 				]]
 				instanceNewindexTable = instanceNewindexTable .. "if l[k]then v[k]=n else l[k]=true "
 				if propertyMethods.willSet then
-					instanceNewindexTable = instanceNewindexTable .. string.format("%s(%s,e,_,n)", functionExecuteID, flattenedPropertyMethodIDs[propertyName].willSet)
+					instanceNewindexTable = instanceNewindexTable .. "w[k](_,n)"
 				end
 				if propertyMethods.set then
-					instanceNewindexTable = instanceNewindexTable .. string.format("%s(%s,e,_,n)", functionExecuteID, flattenedPropertyMethodIDs[propertyName].set)
+					instanceNewindexTable = instanceNewindexTable .. "s[k](_,n)"
 				else
 					instanceNewindexTable = instanceNewindexTable .. "v[k]=n "
 				end
 				if propertyMethods.didSet then
-					instanceNewindexTable = instanceNewindexTable .. string.format("%s(%s,e,_,n)", functionExecuteID, flattenedPropertyMethodIDs[propertyName].didSet)
+					instanceNewindexTable = instanceNewindexTable .. "d[k](_,n)"
 				end
 				instanceNewindexTable = instanceNewindexTable .. "l[k]=nil end end,"
 			else
@@ -448,10 +490,10 @@ for i, classDetails in pairs(classOrder) do
 		-- add the class metatable
 		if mode == "instance" then
 			add("setmetatable(%s,{__index=%s,__newindex=%s,", className, valueTableId, functionErrorIDs.metatable.class.newindex)
-			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID)
+			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID)
 			add("__tostring=function()return %s end})", classTostringIDs[className])
 		elseif mode == "static" then
-			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, typeOfTreeID})
+			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 		end
 	end
 	for i, str in ipairs(staticInitialiseStrings) do

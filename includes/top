@@ -1,6 +1,43 @@
 dofile("serialise")
 
-local __CLASS__instance_create = function(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, typeOfTree, ...)
+local function __CLASS__localise_functions(instance, funcs, instanceEnvironment)
+	local isFirst = true
+	local superFuncs = {}
+	local stack = {}
+	local n = 1
+	local f
+	for superI, func in pairs(funcs) do
+		if not isFirst then
+			stack[n] = {superI, func}
+			n = n + 1
+		else
+			f = func
+			isFirst = false
+		end
+	end
+	for i = n - 1, 1, -1 do
+		local details = stack[i]
+		local superI = details[1]
+		local func = setfenv(details[2](supers[superI], superFuncs[i + 1]), instanceEnvironment)
+		local super = superFuncs[i + 1]
+		local __index
+		if super then
+			__index = function(_, k, v)
+				if k == "super" then
+					return super
+				else
+					__CLASS__7(_, k, v)
+				end
+			end
+		else
+			__index = __CLASS__7
+		end
+		superFuncs[i] = setmetatable({}, {__index = __index, __newindex = __CLASS__8, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
+	end
+	return setfenv(f(instance, superFuncs[1]), instanceEnvironment)
+end
+
+local __CLASS__instance_create = function(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, propertyMethodFunctions, typeOfTree, ...)
 	local instanceEnvironment
 	if instanceVariables then
 		instanceEnvironment = setmetatable({}, {
@@ -34,13 +71,23 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 	local supers__tostrings = {}
 	local supersEnvironments = {}
 	local supersValues = {}
+	local getMethods, willSetMethods, setMethods, didSetMethods
+	if propertyMethodFunctions then
+		getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
+		local propertyMethods = {get = getMethods, willSet = willSetMethods, set = setMethods, didSet = didSetMethods}
+		for methodName, properties in pairs(propertyMethodFunctions) do
+			for propertyName, funcs in pairs(properties) do
+				propertyMethods[methodName][propertyName] = __CLASS__localise_functions(instance, funcs, instanceEnvironment)
+			end
+		end
+	end
 	local __tostring = instanceType .. " of '" .. name .. "': " .. tostring(instance):sub(8)
 	setmetatable(instance, {
 		__index = function(_,k)
-			return instance__index[k](instance, k, values, instanceEnvironment, getLocks)
+			return instance__index[k](instance, k, values, getMethods, getLocks)
 		end,
 		__newindex = function(_,k,v)
-			instance__newindex[k](instance, k, v, values, instanceEnvironment, setLocks)
+			instance__newindex[k](instance, k, v, values, willSetMethods, setMethods, didSetMethods, setLocks)
 		end,
 		__tostring = function() return __tostring end
 	})
@@ -67,40 +114,7 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 
 	if instanceFunctions then
 		for k, funcs in pairs(instanceFunctions) do
-			local isFirst = true
-			local superFuncs = {}
-			local stack = {}
-			local n = 1
-			local f
-			for superI, func in pairs(funcs) do
-				if not isFirst then
-					stack[n] = {superI, func}
-					n = n + 1
-				else
-					f = func
-					isFirst = false
-				end
-			end
-			for i = n - 1, 1, -1 do
-				local details = stack[i]
-				local superI = details[1]
-				local func = setfenv(details[2](supers[superI], superFuncs[i + 1]), instanceEnvironment)
-				local super = superFuncs[i + 1]
-				local __index
-				if super then
-					__index = function(_, k, v)
-						if k == "super" then
-							return super
-						else
-							__CLASS__7(_, k, v)
-						end
-					end
-				else
-					__index = __CLASS__7
-				end
-				superFuncs[i] = setmetatable({}, {__index = __index, __newindex = __CLASS__8, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
-			end
-			values[k] = setfenv(f(instance, superFuncs[1]), instanceEnvironment)
+			values[k] = __CLASS__localise_functions(instance, funcs, instanceEnvironment)
 		end
 	end
 
