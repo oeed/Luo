@@ -1,5 +1,11 @@
 class Basic
 
+	enum Number numbers = {
+		ONE = 1,
+		TWO = 2,
+		THREE = 3,
+	}
+
 	property Boolean calledInitialise = false
 	property Number initialiseArgsCount
 	property String aSetter = "go away"
@@ -20,6 +26,10 @@ class Basic
 		return first .. second
 	end
 
+	function String aSuperFunction(String first, String second)
+		return first .. second
+	end
+
 	function initialise(...)
 		self.calledInitialise = true
 		self.initialiseArgsCount = #{...}
@@ -33,6 +43,10 @@ class Child extends Basic
 
 	get aGetter()
 		return super()
+	end
+
+	function String aSuperFunction(String first)
+		return super(first:upper(), "extra")
 	end
 
 end
