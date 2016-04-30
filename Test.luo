@@ -1,6 +1,6 @@
 
-class Small
-	--this
+class Basic
+
 	property Boolean calledInitialise = false
 	property Number initialiseArgsCount
 	property String aSetter = "go away"
@@ -10,11 +10,20 @@ class Small
 	property String aPlainValue = "hello"
 
 	set aSetter(aSetter)
+		print(aSetter)
 		self.aSetter = aSetter:upper()
 	end
 
 	get aGetter()
+		print("getter")
+		print(self)
+		print(super)
+		print(self.aGetter)
 		return self.aGetter:lower()
+	end
+
+	function String aFunction(String first, String second)
+		return first .. second
 	end
 
 	function initialise(...)
@@ -24,13 +33,15 @@ class Small
 
 end
 
--- class Other 
+class Child extends Basic
+	
+	default aDefault = "a new default"
 
--- 	property String aSetter = "go away"
+	get aGetter()
+		print("SUPER")
+		print(super)
+		return super()
+	end
 
--- 	get aSetter()
--- 		print("super getter")
--- 		return "d"
--- 	end
 
--- end
+end

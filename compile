@@ -2,7 +2,7 @@
 
 local floor, insert = math.floor, table.insert
 
-local parsed, fileEnvironments = loadfile( "parse" )( "Small.luo" )
+local parsed, fileEnvironments = loadfile( "parse" )( "Test.luo" )
 print("Starting compile...")
 local file = ""
 
@@ -389,7 +389,6 @@ for i, classDetails in pairs(classOrder) do
 				end
 			end
 		end
-
 
 		-- create the instance __index & __newindex methods for accessing properties and functions
 		local instanceIndexTableID
