@@ -1,4 +1,3 @@
-
 class Basic
 
 	property Boolean calledInitialise = false
@@ -10,15 +9,10 @@ class Basic
 	property String aPlainValue = "hello"
 
 	set aSetter(aSetter)
-		print(aSetter)
 		self.aSetter = aSetter:upper()
 	end
 
 	get aGetter()
-		print("getter")
-		print(self)
-		print(super)
-		print(self.aGetter)
 		return self.aGetter:lower()
 	end
 
@@ -38,10 +32,7 @@ class Child extends Basic
 	default aDefault = "a new default"
 
 	get aGetter()
-		print("SUPER")
-		print(super)
 		return super()
 	end
-
 
 end
