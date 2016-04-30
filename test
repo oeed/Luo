@@ -15,7 +15,7 @@ function testM(name, value, pattern)
 	testCount = testCount + 1
 	local match = {value:match(pattern)}
 	if #match == 0 then
-		print("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected to match pattern '" .. tostring(expected) .. "'")
+		print("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected to match pattern '" .. tostring(pattern) .. "'")
 		return
 	end
 	print("Test Passed! ('" .. name .. "')")
@@ -23,7 +23,7 @@ function testM(name, value, pattern)
 	return unpack(match)
 end
 
-function testF(name, func, ...)
+function testFV(name, func, ...)
 	testCount = testCount + 1
 	local expected = {...}
 	local returned = {func()}
@@ -34,6 +34,26 @@ function testF(name, func, ...)
 		for i, v in ipairs(returned) do
 			if v ~= expected[i] then
 				print("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(expected[i]) .. "'")
+				return
+			end
+		end
+	end
+	print("Test Passed! ('" .. name .. "')")
+	testSuccesses = testSuccesses + 1
+	return unpack(returned)
+end
+
+function testFM(name, func, ...)
+	testCount = testCount + 1
+	local patterns = {...}
+	local returned = {func()}
+	if #patterns ~= #returned then
+		print("Test Failed ('" .. name .. "'): expected " .. #patterns " return values, got " .. #returned)
+		return
+	else
+		for i, v in ipairs(returned) do
+			if (type(v) == "string" and not v:match(patterns[i])) or (type(v) ~= "string" and patterns[i] ~= v) then
+				print("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(patterns[i]) .. "'")
 				return
 			end
 		end
