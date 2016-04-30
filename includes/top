@@ -1,6 +1,6 @@
 dofile("serialise")
 
-local function __CLASS__localise_functions(instance, funcs, instanceEnvironment)
+local function __CLASS__localise_functions(instance, funcs, instanceEnvironment, supers, supers__tostrings)
 	local isFirst = true
 	local superFuncs = {}
 	local stack = {}
@@ -26,7 +26,7 @@ local function __CLASS__localise_functions(instance, funcs, instanceEnvironment)
 				if k == "super" then
 					return super
 				else
-					__CLASS__7(_, k, v)
+					__CLASS__7(_, k, v) -- __CLASS__error_function_super_no_index
 				end
 			end
 		else
@@ -67,31 +67,12 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 		end
 	end
 	local getLocks, setLocks = {}, {}
+	local __tostring = instanceType .. " of '" .. name .. "': " .. tostring(instance):sub(8)
+
 	local supers = {}
 	local supers__tostrings = {}
 	local supersEnvironments = {}
 	local supersValues = {}
-	local getMethods, willSetMethods, setMethods, didSetMethods
-	if propertyMethodFunctions then
-		getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
-		local propertyMethods = {get = getMethods, willSet = willSetMethods, set = setMethods, didSet = didSetMethods}
-		for methodName, properties in pairs(propertyMethodFunctions) do
-			for propertyName, funcs in pairs(properties) do
-				propertyMethods[methodName][propertyName] = __CLASS__localise_functions(instance, funcs, instanceEnvironment)
-			end
-		end
-	end
-	local __tostring = instanceType .. " of '" .. name .. "': " .. tostring(instance):sub(8)
-	setmetatable(instance, {
-		__index = function(_,k)
-			return instance__index[k](instance, k, values, getMethods, getLocks)
-		end,
-		__newindex = function(_,k,v)
-			instance__newindex[k](instance, k, v, values, willSetMethods, setMethods, didSetMethods, setLocks)
-		end,
-		__tostring = function() return __tostring end
-	})
-
 	if supers_names then
 		for i, super_name in ipairs(supers_names) do
 			local super = {}
@@ -112,9 +93,30 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 		end
 	end
 
+	local getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
+	setmetatable(instance, {
+		__index = function(_,k)
+			return instance__index[k](instance, k, values, getMethods, getLocks)
+		end,
+		__newindex = function(_,k,v)
+			instance__newindex[k](instance, k, v, values, willSetMethods, setMethods, didSetMethods, setLocks)
+		end,
+		__tostring = function() return __tostring end
+	})
+	if propertyMethodFunctions then
+		-- getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
+		local propertyMethods = {get = getMethods, willSet = willSetMethods, set = setMethods, didSet = didSetMethods}
+		for methodName, properties in pairs(propertyMethodFunctions) do
+			for propertyName, funcs in pairs(properties) do
+				propertyMethods[methodName][propertyName] = __CLASS__localise_functions(instance, funcs, instanceEnvironment, supers, supers__tostrings)
+			end
+		end
+	end
+
+
 	if instanceFunctions then
 		for k, funcs in pairs(instanceFunctions) do
-			values[k] = __CLASS__localise_functions(instance, funcs, instanceEnvironment)
+			values[k] = __CLASS__localise_functions(instance, funcs, instanceEnvironment, supers, supers__tostrings)
 		end
 	end
 
@@ -124,7 +126,7 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 
 	local initialiseFunction = values.initialise
 	if initialiseFunction then
-		initialiseFunction(instance, ...)
+		initialiseFunction(instance,...)
 	end
 	return instance
 end
