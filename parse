@@ -1,5 +1,5 @@
 -- TODO: do semi-colons work??
--- TODO: prevent getters and setters on methods
+-- TODO: prevent getters and setters on methods (maybe already fixed?)
 -- TODO: for some reason aNumber from Window isn't showing up in the parse
 
 local args = { ... }
@@ -781,12 +781,12 @@ for i, fileName in ipairs( args ) do
 					captureSingleParameter( keyword == KEYWORD_GET and "" or name )
 
 					local block, startLine = captureBlock()
-					propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) ..")" .. block, startLine }
+					propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
 				elseif keyword == KEYWORD_EVENT then
 					local name = demandImmediateNextName( "event function handle name" )
 					local eventClass, eventPhase, parameterName = captureEventParameter()
 					local block, startLine = captureBlock()
-					local eventTable = { "(__CLASS__self_passed," .. parameterName ..")" .. block, startLine, eventClass, eventPhase }
+					local eventTable = { "(__CLASS__self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase }
 					if isStatic then
 						currentClass.static.eventHandles[name] = eventTable
 					else
@@ -908,13 +908,13 @@ for i, fileName in ipairs( args ) do
 						})
 						hasNext = isNext( "^%s*%,", true )
 					until not hasNext
-
+					isNext( "^%s*%)", true ) -- capture the trailing bracket
 					local block, startLine = captureBlock()
 					local functionString = "(__CLASS__self_passed"
 					for i, parameter in ipairs( parameters ) do
 						functionString = functionString  .. "," .. parameter.name
 					end
-					local functionTable = { functionString .. block, startLine, parameters, returnTypes }
+					local functionTable = { functionString .. ")", block, startLine, parameters, returnTypes }
 					if isStatic then
 						currentClass.static.functions[name] = functionTable
 					else

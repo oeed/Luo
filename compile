@@ -77,8 +77,8 @@ local functionErrorIDs = {
 	},
 	readOnly = addFunction([[(_,k,v)%s("attempted to set read only property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID),
 	type = {
-		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected '"..t.."'")end]], functionErrorID),
-		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected '"..t.."'")end]], functionErrorID),
+		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 	}
 }
 
@@ -175,10 +175,12 @@ local standardTypes = {
 	Thread = true,
 	Function = true
 }
+local TYPE_ANY = "Any"
 local function typeCheck(typeName, allowsNil)
-	allowsNil = allowsNil ~= nil and allowsNil or false
-	if typeName == "Any" then
-		return -- Any doesn't do any type checking
+	if allowsNil == nil then error("missing allowsNil value") end
+	-- allowsNil = allowsNil ~= nil and allowsNil or false
+	if typeName == TYPE_ANY and allowsNil then
+		return -- Any allowsNil doesn't do any type checking
 	end
 	local ids = functionTypeCheckIDs[allowsNil]
 	if ids[typeName] then
@@ -189,24 +191,25 @@ local function typeCheck(typeName, allowsNil)
 	local allowsNilCheckOr = allowsNil and "v~=nil and " or ""
 	local allowsNilCheckReturnIf = allowsNil and "if v==nil then return false end " or ""
 	local allowsNilCheckReturnIfNotTable = allowsNil and "if v==nil then return false elseif type(v)~=\"table\" then return true end " or "if type(v)~=\"table\" then return true end "
-	if standardTypes[typeName] then
+	if typeName == TYPE_ANY then
+		id = addFunction("(v)return v~=nil end")
+	elseif standardTypes[typeName] then
 		id = addFunction("(v)return %stype(v)~=\"%s\"end", allowsNilCheckOr, typeName:lower())
 	elseif typeName == "Class" then -- this means a CLASS, not an instance, not a static instance, a plain old class
 		id = addFunction("(v)return %snot %s[v]or true end", allowsNilCheckOr, classesID)
 	elseif typeName:match("^{.+}$") then
 		local dictionaryTypeName1, dictionaryTypeName2 = typeName:match("^{([_%a][_%w]*)=([_%a][_%w]*)}$")
 		if dictionaryTypeName1 and dictionaryTypeName2 then
-			id = addFunction("(v)%sfor k,V in pairs(v)do if %s(k)or %s(V)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(dictionaryTypeName1), typeCheck(dictionaryTypeName2))
+			id = addFunction("(v)%sfor k,V in pairs(v)do if %s(k)or %s(V)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(dictionaryTypeName1, false), typeCheck(dictionaryTypeName2, false))
 		else
 			local arrayTypeName = typeName:match("^{([_%a][_%w]*)}$")
 			if arrayTypeName then
-				id = addFunction("(v)%sfor i,V in pairs(v)do if %s(k)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(arrayTypeName))
+				id = addFunction("(v)%sfor i,V in pairs(v)do if %s(k)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(arrayTypeName, false))
 			end
 		end
 	else
 		local staticClassName = typeName:match("^([_%a][_%w]*)%.static$")
 		if staticClassName then
-			print(staticClassName)
 			-- this is a static class
 			-- first check if that class name is defined
 			if not standardTypes[staticClassName] and parsed[staticClassName] then
@@ -226,8 +229,25 @@ end
 -- the blank __index and __newindex functions for properties
 local functionBlankIndexID = nextID()
 add("local function %s(_,k,v)return v[k] end ", functionBlankIndexID)
-local functionBlankNewindexID = nextID()
-add("local function %s(_,k,n,v)v[k]=n end ", functionBlankNewindexID)
+local functionBlankNewindexIDs = {[true]={},[false]={}}
+local function blankNewindexIDs(typeName, allowsNil)
+	if functionBlankNewindexIDs[allowsNil][typeName] then
+		return functionBlankNewindexIDs[allowsNil][typeName]
+	else
+		local id = nextID()
+		functionBlankNewindexIDs[allowsNil][typeName] = id
+		if typeName == TYPE_ANY then
+			if allowsNil then
+				add("local function %s(_,k,n,v)v[k]=n end ", id)
+			else
+				add("local function %s(_,k,n,v)if n==nil then %s(_,k,%q,n)end v[k]=n end ", id, functionErrorIDs.type.property, typeName)
+			end
+		else
+			add("local function %s(_,k,n,v)if %s(n)then %s(_,k,%q,n)end v[k]=n end ", id, typeCheck(typeName, allowsNil), functionErrorIDs.type.property, typeName .. (allowsNil and " (allowsNil)" or ""))
+		end
+		return id
+	end
+end
 
 local classMetatableMetatableID = nextID()
 add("local %s={__index=%s,__newindex=%s}", classMetatableMetatableID, functionErrorIDs.metatable.class.index, functionErrorIDs.metatable.class.newindex)
@@ -317,7 +337,13 @@ for i, classDetails in pairs(classOrder) do
 		for functionName, functionDetails in pairs(modeDetails.functions) do
 			-- add the actual function code
 			local functionID = nextID()
-			add("local function %s(self,super)return function%s end ", functionID, functionDetails[1])
+			local typeChecking = ""
+			for i, argumentDetails in ipairs(functionDetails[4]) do
+				if not argumentDetails.isVarArg and argumentDetails.type then
+					typeChecking = typeChecking .. string.format("if %s(%s)then %s(self,%q,%q,%q,%s)end ", typeCheck(argumentDetails.type, argumentDetails.allowsNil), argumentDetails.name, functionErrorIDs.type.parameter, argumentDetails.name, functionName, argumentDetails.type .. (argumentDetails.allowsNil and " (allowsNil)" or ""), argumentDetails.name)
+				end
+			end
+			add("local function %s(self,super)return function%s%s%s end ", functionID, functionDetails[1], typeChecking, functionDetails[2])
 			functionIDs[functionName] = functionID
 		end
 		classDetails[mode].functionIDs = functionIDs
@@ -491,6 +517,11 @@ for i, classDetails in pairs(classOrder) do
 			elseif propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
 				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,w,s,d,l)", propertyName)
 				-- TODO: add value checking
+				-- (_,e,k,t,v)
+				if propertyDetails.type ~= TYPE_ANY then
+					print("check for " .. propertyName)
+					instanceNewindexTable = instanceNewindexTable .. string.format("if %s(n)then %s(_,k,%q,n)end ", typeCheck(propertyDetails.type, propertyDetails.allowsNil), functionErrorIDs.type.property, propertyDetails.type .. (propertyDetails.allowsNil and " (allowsNil)" or ""))
+				end
 				--[[
 					if __CLASS__type_check_String(value) then
 						__CLASS__error_type_instance_property(self, key, "String", value)
@@ -511,7 +542,7 @@ for i, classDetails in pairs(classOrder) do
 				instanceNewindexTable = instanceNewindexTable .. "l[k]=nil end end,"
 			else
 				-- there aren't any methods, we just need to set the value
-				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionBlankNewindexID)
+				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, blankNewindexIDs(propertyDetails.type, propertyDetails.allowsNil))
 			end
 			didAdd = true
 		end

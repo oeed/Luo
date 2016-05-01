@@ -10,6 +10,9 @@ class Basic
 	property Number initialiseArgsCount
 	property String aSetter = "go away"
 	property String aGetter = "GO AWAY"
+	property String allowsNil aNilable = "hello"
+	property String aNonNilable = "hello"
+	property Number aNumber = 0
 
 	property String aDefault = "this is a default value"
 	property String aPlainValue = "hello"
@@ -25,12 +28,12 @@ class Basic
 		return self.aGetter:lower()
 	end
 
-	function String aFunction(String first, String second)
-		return first .. second
+	function String aFunction(String first, String second, third)
+		return first .. second .. third
 	end
 
-	function String aSuperFunction(String first, String second)
-		return first .. second
+	function String aSuperFunction(String first, String second, third)
+		return first .. second .. tostring(third)
 	end
 
 	function initialise(...)
@@ -49,7 +52,7 @@ class Child extends Basic
 	end
 
 	function String aSuperFunction(String first)
-		return super(first:upper(), "extra")
+		return super(first:upper(), "extra", 7)
 	end
 
 end

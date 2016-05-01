@@ -28,7 +28,7 @@ function testFV(name, func, ...)
 	local expected = {...}
 	local returned = {func()}
 	if #expected ~= #returned then
-		print("Test Failed ('" .. name .. "'): expected " .. #expected " return values, got " .. #returned)
+		print("Test Failed ('" .. name .. "'): expected " .. #expected .. " return values, got " .. #returned)
 		return
 	else
 		for i, v in ipairs(returned) do
@@ -48,7 +48,7 @@ function testFM(name, func, ...)
 	local patterns = {...}
 	local returned = {func()}
 	if #patterns ~= #returned then
-		print("Test Failed ('" .. name .. "'): expected " .. #patterns " return values, got " .. #returned)
+		print("Test Failed ('" .. name .. "'): expected " .. #patterns .. " return values, got " .. #returned)
 		return
 	else
 		for i, v in ipairs(returned) do
