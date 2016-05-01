@@ -438,17 +438,17 @@ for i, fileName in ipairs( args ) do
 
 	function nextType()
 		-- {String = Number}
-		local dictionary = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*=%s*[_%a][_%w]*%s*})", 4 )
+		local dictionary, matches = firstMatch( "^%s*{%s*([_%a][_%w]*)%s*=%s*([_%a][_%w]*)%s*}" )
 		if dictionary then
-			return dictionary, true
+			return "{" .. matches[3] .. "=" .. matches[4] .. "}", true
 		else
 			-- {String}
-			local array = firstMatch( "^(%s*)({%s*[_%a][_%w]*%s*})", 4 )
+			local array = firstMatch( "^%s*{%s*([_%a][_%w]*)%s*}" )
 			if array then
-				return array, true
+				return "{" .. array .. "}", true
 			else
 				-- String
-				return firstMatch( "^(%s*)([_%a][_%w]*)", 4 ), false
+				return firstMatch( "^%s*([_%a][_%w]*)" ), false
 			end
 		end
 	end

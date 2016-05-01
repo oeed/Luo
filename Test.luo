@@ -14,6 +14,9 @@ class Basic
 	property String aDefault = "this is a default value"
 	property String aPlainValue = "hello"
 
+	property {String} allowsNil stringTable
+	property { String = Number } allowsNil stringNumberTable
+
 	set aSetter(aSetter)
 		self.aSetter = aSetter:upper()
 	end
