@@ -352,6 +352,9 @@ for i, classDetails in pairs(classOrder) do
 			local functionID = nextID()
 			local typeChecking = ""
 			for i, argumentDetails in ipairs(functionDetails[4]) do
+				if argumentDetails.defaultValue then
+					typeChecking = typeChecking .. string.format("if %s==nil then %s=%s end ", argumentDetails.name, argumentDetails.name, argumentDetails.defaultValue, argumentDetails.name, argumentDetails.defaultValue)
+				end
 				if not argumentDetails.isVarArg and argumentDetails.type then
 					typeChecking = typeChecking .. string.format("if %s(%s)then %s(self,%q,%q,%q,%s)end ", typeCheck(argumentDetails.type, argumentDetails.allowsNil), argumentDetails.name, functionErrorIDs.type.parameter, argumentDetails.name, functionName, argumentDetails.type .. (argumentDetails.allowsNil and " (allowsNil)" or ""), argumentDetails.name)
 				end

@@ -23,7 +23,9 @@ testFM("Instance Invalid Value Catching w. Setter", function()return pcall(funct
 testFV("Instance nil Value For allowsNil", function()return pcall(function()basic.aNilable = nil end)end, true)
 testFM("Instance nil Value For non-allowsNil", function()return pcall(function()basic.aNonNilable = nil end)end, false, ".+:%d+: attempted to set property 'aNonNilable' of 'instance of 'Basic': 0x%x+' to an invalid value 'nil', expected type 'String'")
 testFM("Instance Invalid Getter Return Catching", function()return pcall(function()local v = basic.anInvalidGetter end)end, false, ".+:%d+: return value from getter 'anInvalidGetter' of 'instance of 'Basic': 0x%x+' was an invalid value '42', expected type 'String'")
-
+testFM("Instance Invalid Array Type Catching", function()return pcall(function()basic.stringTable = {"one", 2, "three"} end)end, false, ".+:%d+: attempted to set property 'stringTable' of 'instance of 'Basic': 0x%x+' to an invalid value 'table: 0x%x+', expected type '{String} %(allowsNil%)'")
+testFM("Instance Invalid Dictionary Type Catching", function()return pcall(function()basic.stringNumberTable = {["one"] = 1, [2] = 2, ["three"] = 3} end)end, false, ".+:%d+: attempted to set property 'stringNumberTable' of 'instance of 'Basic': 0x%x+' to an invalid value 'table: 0x%x+', expected type '{String=Number} %(allowsNil%)'")
+testV("Instance Function Default Values", basic:aDefaultFunction(), "123")
 
 -- super class testing
 local child = Child("well", "hello", 42)

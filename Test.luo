@@ -1,3 +1,6 @@
+
+ONE, TWO, THREE = "1", "2", "3"
+
 class Basic
 
 	enum Number numbers = {
@@ -37,6 +40,10 @@ class Basic
 		return first .. second .. third
 	end
 
+	function String aDefaultFunction(String first = ONE, String second = "2", third = THREE)
+		return first .. second .. third
+	end
+
 	function String aSuperFunction(String first, String second, third)
 		return first .. second .. tostring(third)
 	end
@@ -62,7 +69,7 @@ class Child extends Basic
 
 end
 
-class Invalid extends Basic
+class Invalid
 	
 	property Number aBadDefault = "nope"
 
