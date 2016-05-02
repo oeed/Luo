@@ -38,7 +38,7 @@ local function __CLASS__localise_functions(instance, funcs, instanceEnvironment,
 end
 
 local __CLASS__instance_create = function(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, propertyMethodFunctions, typeOfTree, ...)
-	(instanceType == "static" and __CLASS__G or __CLASS__F)[instance] = typeOfTree -- instancesID/staticInstancesID
+	(instanceType == "static" and __CLASS__H or __CLASS__G)[instance] = typeOfTree -- instancesID/staticInstancesID
 	local instanceEnvironment
 	if instanceVariables then
 		instanceEnvironment = setmetatable({}, {
@@ -56,7 +56,7 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 			end
 		})
 		for k, v in pairs(instanceVariables) do
-			instanceEnvironment[k] = __CLASS__D(v, environmentClass)
+			instanceEnvironment[k] = __CLASS__E(v, environmentClass)
 		end
 	else
 		instanceEnvironment = environmentClass
@@ -64,7 +64,7 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 	local values = {}
 	if defaultValues then
 		for k,v in pairs(defaultValues) do
-			values[k] = __CLASS__D(v, environmentClass)
+			values[k] = __CLASS__E(v, environmentClass)
 		end
 	end
 	local getLocks, setLocks = {}, {}

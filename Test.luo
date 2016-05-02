@@ -13,6 +13,7 @@ class Basic
 	property String allowsNil aNilable = "hello"
 	property String aNonNilable = "hello"
 	property Number aNumber = 0
+	property String anInvalidGetter = "GO AWAY"
 
 	property String aDefault = "this is a default value"
 	property String aPlainValue = "hello"
@@ -26,6 +27,10 @@ class Basic
 
 	get aGetter()
 		return self.aGetter:lower()
+	end
+
+	get anInvalidGetter()
+		return 42
 	end
 
 	function String aFunction(String first, String second, third)

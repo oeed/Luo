@@ -79,6 +79,9 @@ local functionErrorIDs = {
 	type = {
 		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		returned = {
+			get = addFunction([[(_,k,t,v)%s("return value from getter '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		}
 	}
 }
 
@@ -506,7 +509,11 @@ for i, classDetails in pairs(classOrder) do
 				-- there is a custom index property method
 				instanceIndexTable = instanceIndexTable .. string.format("[%q]=function(_,k,v,g,l)", propertyName)
 				instanceIndexTable = instanceIndexTable .. "if l[k]then return v[k]else l[k]=true "
-				instanceIndexTable = instanceIndexTable .. "local v=g[k](_)l[k]=nil return v end end,"
+				instanceIndexTable = instanceIndexTable .. "local v=g[k](_)l[k]=nil "
+				if propertyDetails.type ~= TYPE_ANY or not propertyDetails.allowsNil then
+					instanceIndexTable = instanceIndexTable .. string.format("if %s(v)then %s(_,k,%q,v)end ", typeCheck(propertyDetails.type, propertyDetails.allowsNil), functionErrorIDs.type.returned.get, propertyDetails.type .. (propertyDetails.allowsNil and " (allowsNil)" or ""))
+				end
+				instanceIndexTable = instanceIndexTable .. "return v end end,"
 			else
 				-- there aren't any methods, we just need to return the value
 				instanceIndexTable = instanceIndexTable .. string.format("[%q]=%s,", propertyName, functionBlankIndexID)
@@ -518,15 +525,10 @@ for i, classDetails in pairs(classOrder) do
 				instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,w,s,d,l)", propertyName)
 				-- TODO: add value checking
 				-- (_,e,k,t,v)
-				if propertyDetails.type ~= TYPE_ANY then
+				if propertyDetails.type ~= TYPE_ANY or not propertyDetails.allowsNil then
 					print("check for " .. propertyName)
 					instanceNewindexTable = instanceNewindexTable .. string.format("if %s(n)then %s(_,k,%q,n)end ", typeCheck(propertyDetails.type, propertyDetails.allowsNil), functionErrorIDs.type.property, propertyDetails.type .. (propertyDetails.allowsNil and " (allowsNil)" or ""))
 				end
-				--[[
-					if __CLASS__type_check_String(value) then
-						__CLASS__error_type_instance_property(self, key, "String", value)
-					end
-				]]
 				instanceNewindexTable = instanceNewindexTable .. "if l[k]then v[k]=n else l[k]=true "
 				if propertyMethods.willSet then
 					instanceNewindexTable = instanceNewindexTable .. "w[k](_,n)"
