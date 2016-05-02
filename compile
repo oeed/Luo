@@ -80,6 +80,7 @@ local functionErrorIDs = {
 		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		default = addFunction([[(_,k,t,v)%s("default value of property '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		enum = addFunction([[(_,k,t,v)%s("enum '".._.."' has an invalid value '"..tostring(v).."' for key '"..k.."', expected type '"..t.."'")end]], functionErrorID),
 		returned = {
 			get = addFunction([[(_,k,t,v)%s("return value from getter '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		}
@@ -288,6 +289,11 @@ for i, classDetails in pairs(classOrder) do
 		enumTostringIDs[enumName] = enumTostringID
 		add("local %s=%s", enumID, content.values)
 		add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
+
+		-- check the default values of the enum
+		-- (_,k,t,v)
+		add("for k,v in pairs(%s)do if %s(v)then %s(%q,k,%q,v)end end ", enumID, typeCheck(content.type, false), functionErrorIDs.type.enum, className .. "." .. enumName, content.type)
+
 		-- create the type checking function
 		-- TODO: enum type check function
 		-- local enumTypeCheckID = nextID()

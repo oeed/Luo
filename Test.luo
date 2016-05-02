@@ -6,7 +6,7 @@ class Basic
 	enum Number numbers = {
 		ONE = 1,
 		TWO = 2,
-		THREE = 3,
+		THREE = 3
 	}
 
 	property Boolean calledInitialise = false
@@ -69,7 +69,7 @@ class Child extends Basic
 
 end
 
-class Invalid
+class InvalidDefault
 	
 	property Number aBadDefault = "nope"
 
