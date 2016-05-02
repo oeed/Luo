@@ -37,8 +37,8 @@ local function __CLASS__localise_functions(instance, funcs, instanceEnvironment,
 	return setfenv(f(instance, superFuncs[1]), instanceEnvironment)
 end
 
-local __CLASS__instance_create = function(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, environmentClass, name, instance__index, instance__newindex, supers_names, propertyMethodFunctions, typeOfTree, ...)
-	(instanceType == "static" and __CLASS__H or __CLASS__G)[instance] = typeOfTree -- instancesID/staticInstancesID
+local __CLASS__instance_create = function(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, defaultTypes, environmentClass, name, instance__index, instance__newindex, supers_names, propertyMethodFunctions, typeOfTree, ...)
+	(instanceType == "static" and __CLASS__I or __CLASS__H)[instance] = typeOfTree -- instancesID/staticInstancesID
 	local instanceEnvironment
 	if instanceVariables then
 		instanceEnvironment = setmetatable({}, {
@@ -56,19 +56,36 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 			end
 		})
 		for k, v in pairs(instanceVariables) do
-			instanceEnvironment[k] = __CLASS__E(v, environmentClass)
+			instanceEnvironment[k] = __CLASS__F(v, environmentClass)
 		end
 	else
 		instanceEnvironment = environmentClass
 	end
+
 	local values = {}
-	if defaultValues then
-		for k,v in pairs(defaultValues) do
-			values[k] = __CLASS__E(v, environmentClass)
-		end
-	end
 	local getLocks, setLocks = {}, {}
 	local __tostring = instanceType .. " of '" .. name .. "': " .. tostring(instance):sub(8)
+	local getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
+	setmetatable(instance, {
+		__index = function(_,k)
+			return instance__index[k](instance, k, values, getMethods, getLocks)
+		end,
+		__newindex = function(_,k,v)
+			instance__newindex[k](instance, k, v, values, willSetMethods, setMethods, didSetMethods, setLocks)
+		end,
+		__tostring = function() return __tostring end
+	})
+	if defaultValues then
+		for k,v in pairs(defaultValues) do
+			local newValue = __CLASS__F(v, environmentClass)
+			local neededType = defaultTypes[k]
+			if neededType and neededType[1](newValue) then
+				__CLASS__C(instance,k,neededType[2],newValue)
+			end
+			values[k] = newValue
+		end
+	end
+
 	local supers = {}
 	local supers__tostrings = {}
 	local supersEnvironments = {}
@@ -92,17 +109,6 @@ local __CLASS__instance_create = function(instance, instanceType, instanceVariab
 			supers__tostrings[i +1] = super__tostring_func
 		end
 	end
-
-	local getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
-	setmetatable(instance, {
-		__index = function(_,k)
-			return instance__index[k](instance, k, values, getMethods, getLocks)
-		end,
-		__newindex = function(_,k,v)
-			instance__newindex[k](instance, k, v, values, willSetMethods, setMethods, didSetMethods, setLocks)
-		end,
-		__tostring = function() return __tostring end
-	})
 	if propertyMethodFunctions then
 		-- getMethods, willSetMethods, setMethods, didSetMethods = {}, {}, {}, {}
 		local propertyMethods = {get = getMethods, willSet = willSetMethods, set = setMethods, didSet = didSetMethods}

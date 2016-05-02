@@ -61,3 +61,9 @@ class Child extends Basic
 	end
 
 end
+
+class Invalid extends Basic
+	
+	property Number aBadDefault = "nope"
+
+end

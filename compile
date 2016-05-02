@@ -78,13 +78,14 @@ local functionErrorIDs = {
 	readOnly = addFunction([[(_,k,v)%s("attempted to set read only property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID),
 	type = {
 		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		default = addFunction([[(_,k,t,v)%s("default value of property '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		returned = {
 			get = addFunction([[(_,k,t,v)%s("return value from getter '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		}
 	}
 }
-
+print(functionErrorIDs.type.default)
 local functionExecuteID = addFunction([[(f,e,...)return setfenv(f, e)(...)end]])
 
 -- TODO: minify when it 100% works
@@ -307,8 +308,10 @@ for i, classDetails in pairs(classOrder) do
 	for mode, modeDetails in pairs({instance = classDetails.instance, static = classDetails.static}) do
 		-- create the detault values
 		local defaultValuesID = nextID()
+		local defaultValuesTypesID = nextID()
 		-- we need to collate all the places where default values are set and flatten it in to one table
 		local flattenedDefaultValues = {}
+		local flattenedDefaultValuesTypes = {}
 		for i, superAllDetails in ipairs(supersDetails) do
 			local superDetails = superAllDetails[mode]
 			-- go through ourself and super
@@ -320,9 +323,11 @@ for i, classDetails in pairs(classOrder) do
 			end
 			for propertyName, propertyDetails in pairs(superDetails.properties) do
 				-- then try to get the default from the property definitions
-				local defaultValue = propertyDetails.defaultValue
 				if not flattenedDefaultValues[propertyName] then
-					flattenedDefaultValues[propertyName] = defaultValue
+					flattenedDefaultValues[propertyName] = propertyDetails.defaultValue
+				end
+				if not flattenedDefaultValuesTypes[propertyName] then
+					flattenedDefaultValuesTypes[propertyName] = {propertyDetails.type, propertyDetails.allowsNil}
 				end
 			end
 		end
@@ -331,6 +336,11 @@ for i, classDetails in pairs(classOrder) do
 			add("[%q]=loadstring(%q),", propertyName, "return " .. defaultValue)
 		end
 		add("}")
+		local defaultValuesTypesString = "local %s={"
+		for propertyName, typeDetails in pairs(flattenedDefaultValuesTypes) do
+			defaultValuesTypesString = defaultValuesTypesString .. string.format("[%q]={%s,%q},", propertyName, typeCheck(typeDetails[1], typeDetails[2]), typeDetails[1] .. (typeDetails[2] and " (allowsNil)" or ""))
+		end
+		add(defaultValuesTypesString .. "}", defaultValuesTypesID)
 
 		-- add the functions
 		local functionIDs = {}
@@ -603,10 +613,10 @@ for i, classDetails in pairs(classOrder) do
 		-- add the class metatable
 		if mode == "instance" then
 			add("setmetatable(%s,{__index=%s,__newindex=%s,", className, valueTableId, functionErrorIDs.metatable.class.newindex)
-			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID)
+			add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID)
 			add("__tostring=function()return %s end})", classTostringIDs[className])
 		elseif mode == "static" then
-			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
+			insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 		end
 	end
 	for i, str in ipairs(staticInitialiseStrings) do
