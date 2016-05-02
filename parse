@@ -335,7 +335,7 @@ for i, fileName in ipairs( args ) do
 						curlyBracketLevel = curlyBracketLevel - 1
 					end
 					if roundBracketLevel == 0 or (char == "," and roundBracketLevel == 1 and curlyBracketLevel == 0 ) then
-						stopLine, stopLinePosition = lineIndex, i
+						stopLine, stopLinePosition = lineIndex, i - 1
 						break
 					end
 				end
@@ -348,7 +348,7 @@ for i, fileName in ipairs( args ) do
 			for i = currentLine, stopLine do
 				defaultValue = defaultValue .. lines[i]:sub(i == currentLine and currentLinePosition or 1, i == stopLine and stopLinePosition or nil) .. (i == stopLine and "" or "\n")
 			end
-			currentLine, currentLinePosition = stopLine, stopLinePosition
+			currentLine, currentLinePosition = stopLine, stopLinePosition + 1
 			return defaultValue
 		end
 	end
