@@ -48,6 +48,17 @@ class Basic
 		return first .. second .. tostring(third)
 	end
 
+	function Number, String, Boolean wrongReturnType()
+		return "Hello", false, 6
+	end
+
+	function func()
+		if true then
+			return "one", two, 3
+		end
+		return "wow"
+	end
+
 	function initialise(...)
 		self.calledInitialise = true
 		self.initialiseArgsCount = #{...}

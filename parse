@@ -5,7 +5,7 @@
 local args = { ... }
 if #args == 0 then
 	args = {
-		"Small.luo"
+		"Test.luo"
 		-- "AlertWindow.luo",
 		-- "Cat.luo"
 	}
@@ -15,7 +15,7 @@ local startTime = os.clock()
 dofile("serialise")
 
 local LINE_START_POSITION = 1
-local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super"
+local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER, KEYWORD_RETURN, KEYWORD_DO = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super", "return", "do"
 local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
 	[KEYWORD_PROPERTY] = true,
 	[KEYWORD_DEFAULT] = true,
@@ -34,7 +34,7 @@ local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the
 local BLOCK_START_KEYWORDS = {
 	[KEYWORD_IF] = true,
 	[KEYWORD_FOR] = true,
-	[KEYWORD_WHILE] = true,
+	[KEYWORD_DO] = true,
 	[KEYWORD_FUNCTION] = true
 }
 
@@ -353,6 +353,74 @@ for i, fileName in ipairs( args ) do
 		end
 	end
 
+	function captureReturnParameter()
+		local lineIndex = currentLine
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		local stopLine, stopLinePosition
+		local hasNext = false
+		repeat
+			local line = lines[lineIndex]
+			local commentsOrStrings = linesCommentsOrStrings[lineIndex]
+			local blockLevel = 0
+			local roundBracketLevel = 0
+			local curlyBracketLevel = 0
+			while true do
+				if not linesCommentsOrStrings[currentLine][currentLinePosition] then
+					local foundMatch = false
+					for keyword, _ in pairs(BLOCK_START_KEYWORDS) do
+						if isNext("^(%s*" .. keyword .. ")", true) then
+							blockLevel = blockLevel + 1
+							foundMatch = true
+							break
+						end
+					end
+					if not foundMatch then
+						local priorLine, priorPosition = currentLine, currentLinePosition
+						if isNext("^(%s*" .. KEYWORD_END .. ")", true) then
+							blockLevel = blockLevel - 1
+							if blockLevel < 0 then
+								currentLine, currentLinePosition = priorLine, priorPosition
+								stopLine, stopLinePosition = priorLine, priorPosition
+								break
+							end
+						else
+							local char = getLine():sub( 1, 1 )
+							if char == "(" then
+								roundBracketLevel = roundBracketLevel + 1
+							elseif char == ")" then
+								roundBracketLevel = roundBracketLevel - 1
+							elseif char == "{" then
+								curlyBracketLevel = curlyBracketLevel + 1
+							elseif char == "}" then
+								curlyBracketLevel = curlyBracketLevel - 1
+							end
+							if char == "," and roundBracketLevel == 0 and curlyBracketLevel == 0 then
+								stopLine, stopLinePosition = priorLine, priorPosition
+								currentLinePosition = currentLinePosition + 1
+								hasNext = true
+								break
+							end
+						end
+					end
+				else
+					-- currentLinePosition = currentLinePosition + 1
+				end
+				currentLinePosition = currentLinePosition + 1
+			end
+			lineIndex = lineIndex + 1
+		until (stopLine and stopLinePosition) or lineIndex > linesCount
+
+		if stopLine and stopLinePosition then
+			local parameter = ""
+			for i = startLine, stopLine do
+				parameter = parameter .. lines[i]:sub(i == startLine and startLinePosition or 1, i == stopLine and stopLinePosition - 1 or nil) .. (i == stopLine and "" or "\n")
+			end
+			-- parameter = parameter:gsub("\n$", "")
+			startLine, startLinePosition = stopLine, stopLinePosition + 1
+			return parameter, hasNext
+		end
+	end
+
 	function isNext( match, captureIfFound )
 		local matchData = { getLine():find( match ) }
 		local start, stop = matchData[1], matchData[2]
@@ -526,6 +594,66 @@ for i, fileName in ipairs( args ) do
 			end
 		end
 		return contents, startLine
+	end
+
+	-- capture until the 'end' keyword of the current block, separating out the return statements
+	function captureReturnsBlock()
+		local keyword
+		local block = {}
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		local level = 1
+		local function addPassed()
+			local contents = ""
+			for i = startLine, currentLine do
+				if i == startLine or i == currentLine then
+					contents = contents .. lines[i]:sub( i == startLine and startLinePosition or 1, i == currentLine and currentLinePosition or nil )
+				else
+					contents = contents .. lines[i]
+				end
+				if i ~= currentLine then
+					contents = contents .. "\n"
+				end
+			end
+			return contents
+		end
+		repeat 
+			local priorLine, priorPosition = currentLine, currentLinePosition
+			keyword = nextMatch( "(%l+)" )
+			if not keyword then
+				parserError( "expected 'end' keyword to complete function" )
+			elseif keyword == KEYWORD_END then
+				level = level - 1
+				if level == 0 then
+					table.insert(block, addPassed())
+				end
+			elseif keyword == KEYWORD_RETURN then
+				-- capture everything up and and including the return
+				local returnLinePosition = currentLinePosition
+				currentLinePosition = currentLinePosition - #KEYWORD_RETURN - 1
+				table.insert(block, addPassed())
+				currentLinePosition = returnLinePosition
+
+				-- capture the return values
+				local values = {}
+				while true do
+					local expression, hasNext = captureReturnParameter()
+					if expression then
+						table.insert(values, expression)
+					end
+					if not expression or not hasNext then
+						break
+					end
+				end
+				if #values > 0 then
+					table.insert(block, values)
+				end
+
+				startLine, startLinePosition = currentLine, currentLinePosition
+			elseif BLOCK_START_KEYWORDS[keyword] then
+				level = level + 1
+			end
+		until level == 0
+		return block, startLine
 	end
 
 	function demandParameters()
@@ -832,6 +960,10 @@ for i, fileName in ipairs( args ) do
 						if hasNext and name then
 							parserError( "invalid return type modifier '" .. name .. "'" )
 						end
+						if hasNext then
+							table.insert( returnTypes, currentReturnType )
+							currentReturnType = nil
+						end
 					until not currentReturnType and not hasNext
 
 					if not name then
@@ -909,7 +1041,7 @@ for i, fileName in ipairs( args ) do
 						hasNext = isNext( "^%s*%,", true )
 					until not hasNext
 					isNext( "^%s*%)", true ) -- capture the trailing bracket
-					local block, startLine = captureBlock()
+					local block, startLine = captureReturnsBlock()
 					local functionString = "(__CLASS__self_passed"
 					for i, parameter in ipairs( parameters ) do
 						functionString = functionString  .. "," .. parameter.name

@@ -26,6 +26,8 @@ testFM("Instance Invalid Getter Return Catching", function()return pcall(functio
 testFM("Instance Invalid Array Type Catching", function()return pcall(function()basic.stringTable = {"one", 2, "three"} end)end, false, ".+:%d+: attempted to set property 'stringTable' of 'instance of 'Basic': 0x%x+' to an invalid value 'table: 0x%x+', expected type '{String} %(allowsNil%)'")
 testFM("Instance Invalid Dictionary Type Catching", function()return pcall(function()basic.stringNumberTable = {["one"] = 1, [2] = 2, ["three"] = 3} end)end, false, ".+:%d+: attempted to set property 'stringNumberTable' of 'instance of 'Basic': 0x%x+' to an invalid value 'table: 0x%x+', expected type '{String=Number} %(allowsNil%)'")
 testV("Instance Function Default Values", basic:aDefaultFunction(), "123")
+testFM("Instance Return Type Catching", function()return pcall(function()basic:wrongReturnType() end)end, false, ".+:%d+: return value 1 from function 'wrongReturnType' of 'instance of 'Basic': 0x%x+' was an invalid value 'Hello', expected type 'Number'")
+
 
 -- super class testing
 local child = Child("well", "hello", 42)
@@ -40,7 +42,7 @@ testV("Subclass Super-only Defined Functions", child:aFunction("one", "two", "th
 testV("Subclass Both-and-sub Defined Functions", child:aSuperFunction("this"), "THISextra7")
 
 -- bad default value testing
-testFM("Invalid Default Value Catching", function()return pcall(function()Invalid() end)end, false, ".+:%d+: default value of property 'aBadDefault' of 'instance of 'Invalid': 0x%x+' was an invalid value 'nope', expected type 'Number'")
+testFM("Invalid Default Value Catching", function()return pcall(function()InvalidDefault() end)end, false, ".+:%d+: default value of property 'aBadDefault' of 'instance of 'InvalidDefault': 0x%x+' was an invalid value 'nope', expected type 'Number'")
 
 
 testsDone()

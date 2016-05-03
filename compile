@@ -83,6 +83,7 @@ local functionErrorIDs = {
 		enum = addFunction([[(_,k,t,v)%s("enum '".._.."' has an invalid value '"..tostring(v).."' for key '"..k.."', expected type '"..t.."'")end]], functionErrorID),
 		returned = {
 			get = addFunction([[(_,k,t,v)%s("return value from getter '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+			func = addFunction([[(_,k,i,v,t)%s("return value "..i.." from function '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		}
 	}
 }
@@ -365,7 +366,31 @@ for i, classDetails in pairs(classOrder) do
 					typeChecking = typeChecking .. string.format("if %s(%s)then %s(self,%q,%q,%q,%s)end ", typeCheck(argumentDetails.type, argumentDetails.allowsNil), argumentDetails.name, functionErrorIDs.type.parameter, argumentDetails.name, functionName, argumentDetails.type .. (argumentDetails.allowsNil and " (allowsNil)" or ""), argumentDetails.name)
 				end
 			end
-			add("local function %s(self,super)return function%s%s%s end ", functionID, functionDetails[1], typeChecking, functionDetails[2])
+			local functionBody = ""
+			local returnTypes = functionDetails[5]
+			for n, part in ipairs(functionDetails[2]) do
+				if type(part) == "string" then
+					functionBody = functionBody .. part
+				elseif type(part) == "table" then
+					-- these are return values
+					local cachedValues = {}
+					for i, value in ipairs(part) do
+						if returnTypes[i] and (returnTypes[i].type ~= TYPE_ANY or returnTypes[i].allowsNil) then
+							cachedValues[i] = true
+							functionBody = functionBody .. string.format("local %s%d=%s if %s(%s%d)then %s(self,%q,%d,%s%d,%q)end ", idPrefix, i, value:gsub("^%s*", ""):gsub("%s*$", ""), typeCheck(returnTypes[i].type, returnTypes[i].allowsNil), idPrefix, i, functionErrorIDs.type.returned.func, functionName, i, idPrefix, i, returnTypes[i].type .. (returnTypes[i].allowsNil and " (allowsNil)" or ""))
+						end
+					end
+					functionBody = functionBody .. "return"
+					for i, value in ipairs(part) do
+						if cachedValues[i] then
+							functionBody = functionBody .. (i == 1 and " " or "") .. idPrefix .. i .. (i ~= #part and "," or "")
+						else
+							functionBody = functionBody .. value .. (i ~= #part and "," or "")
+						end
+					end
+				end
+			end
+			add("local function %s(self,super)return function%s%s%s end ", functionID, functionDetails[1], typeChecking, functionBody)
 			functionIDs[functionName] = functionID
 		end
 		classDetails[mode].functionIDs = functionIDs
