@@ -374,10 +374,27 @@ for i, classDetails in pairs(classOrder) do
 				elseif type(part) == "table" then
 					-- these are return values
 					local cachedValues = {}
-					for i, value in ipairs(part) do
-						if returnTypes[i] and (returnTypes[i].type ~= TYPE_ANY or returnTypes[i].allowsNil) then
-							cachedValues[i] = true
-							functionBody = functionBody .. string.format("local %s%d=%s if %s(%s%d)then %s(self,%q,%d,%s%d,%q)end ", idPrefix, i, value:gsub("^%s*", ""):gsub("%s*$", ""), typeCheck(returnTypes[i].type, returnTypes[i].allowsNil), idPrefix, i, functionErrorIDs.type.returned.func, functionName, i, idPrefix, i, returnTypes[i].type .. (returnTypes[i].allowsNil and " (allowsNil)" or ""))
+					if returnTypes then
+						-- there are a set number of return types
+						local isVarArg = false
+						for i = 1, math.max(#part, #returnTypes) do
+							local returnType = returnTypes[i]
+							local value = part[i]
+							if returnType and returnType.isVarArg then
+								-- we don't care about vararg values' types
+								break
+							end
+							if returnType and not value and not returnType.allowsNil then 
+								-- no value was given for this value, but there should have been one
+								error("compiler error: invalid return value for function '" .. functionName .. "' #" .. i .. ", nothing was given but expected type '" .. returnType.type .. (returnType.allowsNil and " (allowsNil)" or "") .. "'")
+							elseif returnType then 
+								-- this value is fine
+								cachedValues[i] = true
+								functionBody = functionBody .. string.format("local %s%d=%s if %s(%s%d)then %s(self,%q,%d,%s%d,%q)end ", idPrefix, i, value:gsub("^%s*", ""):gsub("%s*$", ""), typeCheck(returnTypes[i].type, returnTypes[i].allowsNil), idPrefix, i, functionErrorIDs.type.returned.func, functionName, i, idPrefix, i, returnType.type .. (returnType.allowsNil and " (allowsNil)" or ""))
+							elseif not returnType and value then
+								-- a value was given, but there should've been one
+								error("compiler error: invalid return value for function '" .. functionName .. "' #" .. i .. ", '" .. value:gsub("^%s*", ""):gsub("%s*$", "") .. "' was given but expected nothing (i.e. too many return values)")
+							end
 						end
 					end
 					functionBody = functionBody .. "return"

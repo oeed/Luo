@@ -930,10 +930,10 @@ for i, fileName in ipairs( args ) do
 						local nextKeyword = nextType( "return type modifiers (readOnly, allowsNil, etc.) or function name" )
 						if not nextKeyword then
 							-- no return type was given, hence we allow ANY return value and any amount of return values. If you don't want to return anything use nil
-							local returnTypesCount = #returnTypes
 							if currentReturnType then
-								-- the current return type is actually the function name
+								-- the current return type is actually the function name, we don't have a type
 								name = currentReturnType.type
+								returnTypes = nil
 								break
 							else
 								-- no function name was given
@@ -963,6 +963,12 @@ for i, fileName in ipairs( args ) do
 						if hasNext then
 							table.insert( returnTypes, currentReturnType )
 							currentReturnType = nil
+							-- varargs might be next (which won't be captured as a keyword)
+							local isVarArg = isNext( "^%s*%.%.%.%s*", true )
+							if isVarArg then
+								table.insert( returnTypes, { isVarArg = true } )
+								hasNext = false
+							end
 						end
 					until not currentReturnType and not hasNext
 
