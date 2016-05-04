@@ -2,8 +2,6 @@ ONE, TWO, THREE = "1", "2", "3"
 
 interface IThingy
 
-	enum Number numbers
-
 	property Boolean calledInitialise
 	property Number initialiseArgsCount
 	property String aSetter
@@ -34,6 +32,7 @@ class Basic implements IThingy
 
 	property {String} allowsNil stringTable
 	property { String = Number } allowsNil stringNumberTable
+	property Basic.numbers number = Basic.numbers.ONE
 
 	set aSetter(aSetter)
 		self.aSetter = aSetter:upper()

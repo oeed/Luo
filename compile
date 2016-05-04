@@ -176,6 +176,8 @@ end
 local classesID = nextID()
 add(classesString .. "}", classesID)
 
+local classesEnumIDs = {}
+local classesEnumTostringIDs = {}
 local functionTypeCheckIDs = {
 	[true] = {}, [false] = {}
 }
@@ -229,6 +231,18 @@ local function typeCheck(typeName, allowsNil)
 			else
 				error("compiler error: unknown class type '" .. typeName .. "' (class isn't defined)")
 			end
+		else
+			local className, enumName = typeName:match("^([_%a][_%w]*)%.([_%a][_%w]*)$")
+			if className and enumName then
+				-- this is an enum
+				local classEnumIDs = classesEnumIDs[className]
+				if classEnumIDs then
+					local enumID = classesEnumIDs[className][enumName]
+					id = addFunction("(v)%sfor i,V in pairs(%s)do if V==v then return false end end return true end", allowsNilCheckReturnIf, enumID)
+				else
+				end
+			else
+			end
 		end
 	end
 	if not id then
@@ -266,6 +280,30 @@ add("local %s={__index=%s,__newindex=%s}", classMetatableMetatableID, functionEr
 local instanceMetatableMetatableID = nextID()
 add("local %s={__index=%s,__newindex=%s}", instanceMetatableMetatableID, functionErrorIDs.metatable.instance.index, functionErrorIDs.metatable.instance.newindex)
 
+-- first create the enums (so they can be used for type checking)
+for i, classDetails in pairs(classOrder) do
+	if not classDetails.isInterface then
+		local className = classDetails.className
+		-- create the enums
+		local enumIDs = {}
+		local enumTostringIDs = {}
+		for enumName, content in pairs(classDetails.enums) do
+			-- create enum's value table
+			local enumID = nextID()
+			enumIDs[enumName] = enumID
+			local enumTostringID = nextID()
+			enumTostringIDs[enumName] = enumTostringID
+			add("local %s=%s", enumID, content.values)
+			add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
+
+			-- check the default values of the enum
+			add("for k,v in pairs(%s)do if %s(v)then %s(%q,k,%q,v)end end ", enumID, typeCheck(content.type, false), functionErrorIDs.type.enum, className .. "." .. enumName, content.type)
+		end
+		classesEnumIDs[className] = enumIDs
+		classesEnumTostringIDs[className] = enumTostringIDs
+	end
+end
+
 -- now create each class one by one
 for i, classDetails in pairs(classOrder) do
 	local className = classDetails.className
@@ -291,27 +329,8 @@ for i, classDetails in pairs(classOrder) do
 		end
 
 		-- create the enums
-		local enumIDs = {}
-		local enumTostringIDs = {}
-		local enumTypeCheckIDs = {}
-		for enumName, content in pairs(classDetails.enums) do
-			-- create enum's value table
-			local enumID = nextID()
-			enumIDs[enumName] = enumID
-			local enumTostringID = nextID()
-			enumTostringIDs[enumName] = enumTostringID
-			add("local %s=%s", enumID, content.values)
-			add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
-
-			-- check the default values of the enum
-			-- (_,k,t,v)
-			add("for k,v in pairs(%s)do if %s(v)then %s(%q,k,%q,v)end end ", enumID, typeCheck(content.type, false), functionErrorIDs.type.enum, className .. "." .. enumName, content.type)
-
-			-- create the type checking function
-			-- TODO: enum type check function
-			-- local enumTypeCheckID = nextID()
-			-- add("__CLASS__")
-		end
+		local enumIDs = classesEnumIDs[className]
+		local enumTostringIDs = classesEnumTostringIDs[className]
 
 		-- add the class' value table
 		local valueTableId = nextID()
@@ -645,10 +664,7 @@ for i, classDetails in pairs(classOrder) do
 					instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionErrorIDs.readOnly)
 				elseif propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
 					instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,w,s,d,l)", propertyName)
-					-- TODO: add value checking
-					-- (_,e,k,t,v)
 					if propertyDetails.type ~= TYPE_ANY or not propertyDetails.allowsNil then
-						print("check for " .. propertyName)
 						instanceNewindexTable = instanceNewindexTable .. string.format("if %s(n)then %s(_,k,%q,n)end ", typeCheck(propertyDetails.type, propertyDetails.allowsNil), functionErrorIDs.type.property, propertyDetails.type .. (propertyDetails.allowsNil and " (allowsNil)" or ""))
 					end
 					instanceNewindexTable = instanceNewindexTable .. "if l[k]then v[k]=n else l[k]=true "

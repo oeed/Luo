@@ -515,8 +515,14 @@ for i, fileName in ipairs( args ) do
 			if array then
 				return "{" .. array .. "}", true
 			else
-				-- String
-				return firstMatch( "^%s*([_%a][_%w]*)" ), false
+				-- Class.enum
+				local className, matches = firstMatch( "^%s*([_%a][_%w]*)%.([_%a][_%w]*)" )
+				if className then
+					return matches[3] .. "." .. matches[4], true
+				else
+					-- String
+					return firstMatch( "^%s*([_%a][_%w]*)" ), false
+				end
 			end
 		end
 	end
@@ -829,7 +835,7 @@ for i, fileName in ipairs( args ) do
 					isStatic = true
 				elseif keyword == KEYWORD_LOCAL then
 					if isInterface then
-						parserError("interfaces cannot defined instance variables.")
+						parserError("interfaces cannot define instance variables.")
 					end
 					local name = demandImmediateNextName( "instance variable name" )
 
@@ -856,6 +862,9 @@ for i, fileName in ipairs( args ) do
 						currentClass.instance.instanceVariables[name] = defaultValue
 					end
 				elseif keyword == KEYWORD_ENUM then
+					if isInterface then
+						parserError("interfaces cannot define enums.")
+					end
 					local propertyType = demandNextType( "enum type" )
 					local name = demandImmediateNextName( "enum name" )
 
@@ -867,11 +876,8 @@ for i, fileName in ipairs( args ) do
 					local hasEquals = isNext( "^(%s*)=(%s*)", true )
 					local values
 					if hasEquals then
-						if isInterface then
-							parserError("interfaces cannot define enum values.")
-						end
 						values = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
-					elseif not isInterface then
+					else
 						parserError( "expected table of enum values" )
 					end
 
