@@ -767,19 +767,15 @@ for i, fileName in ipairs( args ) do
 						className = className,
 						instance = {
 							properties = {},
-							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
 							eventHandles = {},
 							functions = {},
 						},
 						static = {
 							properties = {},
-							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
 							eventHandles = {},
 							functions = {},
 						},
-						enums = {},
-						fileEnvironment = i,
-						lineNumber = currentLine
+						enums = {}
 					}
 				end
 				if parsed[className] then
@@ -948,6 +944,9 @@ for i, fileName in ipairs( args ) do
 						parserError( "default expects equals sign and new default value after property name" )
 					end
 				elseif keyword == KEYWORD_SET or keyword == KEYWORD_DIDSET or keyword == KEYWORD_WILLSET or keyword == KEYWORD_GET then
+					if isInterface then
+						parserError("interfaces cannot require property methods.")
+					end
 					local name = demandImmediateNextName( "property name" )
 					local propertyMethodTable
 					if isStatic then
@@ -959,14 +958,9 @@ for i, fileName in ipairs( args ) do
 						parserError( "Attempted to redefine '" .. keyword .. "' for property '" .. name .. "'." )
 					end
 					captureSingleParameter( keyword == KEYWORD_GET and "" or name )
-
 					
-					if not isInterface then
-						local block, startLine = captureBlock()
-						propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
-					else
-						propertyMethodTable[name] = true
-					end
+					local block, startLine = captureBlock()
+					propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
 				elseif keyword == KEYWORD_EVENT then
 					local name = demandImmediateNextName( "event function handle name" )
 					local eventClass, eventPhase, parameterName = captureEventParameter()

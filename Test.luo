@@ -1,4 +1,3 @@
-
 ONE, TWO, THREE = "1", "2", "3"
 
 interface IThingy
@@ -10,13 +9,10 @@ interface IThingy
 	property String aSetter
 	property String aGetter
 
-	set aSetter(aSetter)
-	get aGetter()
-
 	function String aFunction(String first, String second, third)
 end
 
-class Basic
+class Basic implements IThingy
 
 	enum Number numbers = {
 		ONE = 1,
@@ -51,7 +47,7 @@ class Basic
 		return 42
 	end
 
-	function String aFunction(String first, String second, third)
+	function String aFunction(String first, String second, third, fourth)
 		return first .. second .. third
 	end
 
