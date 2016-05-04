@@ -56,10 +56,6 @@ class Basic
 		return 6, "hello", "wow", 6346
 	end
 
-	function Number, String tooMany()
-		return "Hello", false
-	end
-
 	function func()
 		if true then
 			return "one", two, 3

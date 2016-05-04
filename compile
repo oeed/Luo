@@ -390,6 +390,7 @@ for i, classDetails in pairs(classOrder) do
 							elseif returnType then 
 								-- this value is fine
 								cachedValues[i] = true
+								-- TODO: this is going to break with unpack..
 								functionBody = functionBody .. string.format("local %s%d=%s if %s(%s%d)then %s(self,%q,%d,%s%d,%q)end ", idPrefix, i, value:gsub("^%s*", ""):gsub("%s*$", ""), typeCheck(returnTypes[i].type, returnTypes[i].allowsNil), idPrefix, i, functionErrorIDs.type.returned.func, functionName, i, idPrefix, i, returnType.type .. (returnType.allowsNil and " (allowsNil)" or ""))
 							elseif not returnType and value then
 								-- a value was given, but there should've been one
