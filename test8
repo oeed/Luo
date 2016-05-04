@@ -44,5 +44,4 @@ testV("Subclass Both-and-sub Defined Functions", child:aSuperFunction("this"), "
 -- bad default value testing
 testFM("Invalid Default Value Catching", function()return pcall(function()InvalidDefault() end)end, false, ".+:%d+: default value of property 'aBadDefault' of 'instance of 'InvalidDefault': 0x%x+' was an invalid value 'nope', expected type 'Number'")
 
-
 testsDone()

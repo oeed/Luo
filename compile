@@ -59,6 +59,10 @@ local functionErrorIDs = {
 			index = addFunction([[(_,k)%s("attempted to access non-existant enum '"..k.."' of class '"..tostring(_).."'")end]], functionErrorID),
 			newindex = addFunction([[(_,k,v)%s("attempted to mutate class '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
 		},
+		interface = {
+			index = addFunction([[(_)%s("attempted to access value from interface '"..tostring(_).."'")end]], functionErrorID),
+			newindex = addFunction([[(_,k)%s("attempted to mutate interface '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
+		},
 		instance = {
 			index = addFunction([[(_,k)%s("attempted to access non-existant property '"..k.."' of '"..tostring(_).."'")end]], functionErrorID),
 			newindex = addFunction([[(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
@@ -152,17 +156,19 @@ local classStaticIDs = {}
 local classTostringIDs = {}
 local classesString = "local %s={"
 local didAdd = false
-for className, _ in pairs(parsed) do
+for className, classDetails in pairs(parsed) do
 	-- TODO: maybe add an option which makes these locals?
 	didAdd = true
 	classesString = classesString .. string.format("[%s]=true,", className)
 	add("%s={}", className)
 	local tostringID = nextID()
-	add("local %s=\"class '%s': \"..tostring(%s):sub(8)", tostringID, className, className)
+	add("local %s=\"" .. (classDetails.isInterface and "interface" or "class") .. " '%s': \"..tostring(%s):sub(8)", tostringID, className, className)
 	classTostringIDs[className] = tostringID
-	local staticID = nextID()
-	classStaticIDs[className] = staticID
-	add("local %s={}", staticID)
+	if not classDetails.isInterface then
+		local staticID = nextID()
+		classStaticIDs[className] = staticID
+		add("local %s={}", staticID)
+	end
 end
 if didAdd then
 	classesString = classesString:sub(1, #classesString - 1)
@@ -262,6 +268,7 @@ add("local %s={__index=%s,__newindex=%s}", instanceMetatableMetatableID, functio
 
 -- now create each class one by one
 for i, classDetails in pairs(classOrder) do
+	local className = classDetails.className
 	if not classDetails.isInterface then
 		local interfaces = {}
 		for i, interfaceName in ipairs(classDetails.implements) do
@@ -269,7 +276,6 @@ for i, classDetails in pairs(classOrder) do
 		end
 
 		-- create the tree of super details
-		local className = classDetails.className
 		print("Loading class: " .. className)
 		local supersDetails = {classDetails}
 		local nextSuperName = classDetails.extends
@@ -467,7 +473,7 @@ for i, classDetails in pairs(classOrder) do
 							local functionTypes = functionDetails[n + 3]
 							local name = n == 1 and "parameter" or "return value"
 							if #interfaceTypes ~= #functionTypes then
-								error("compiler error: class '" .. className .. "' " .. mode .. " function '" .. functionName .. "' has a different number of " .. name .. "s than required by interface '" .. interface.className .. "'.")
+								error("compiler error: class '" .. className .. "' " .. mode .. " function '" .. functionName .. "' has a different number of " .. name .. "s (" .. #functionTypes .. ") than required by interface '" .. interface.className .. "' (" .. #interfaceTypes .. ").")
 							end
 							for j, interfaceType in ipairs(interfaceTypes) do
 								local functionType = functionTypes[j]
@@ -709,6 +715,9 @@ for i, classDetails in pairs(classOrder) do
 					didAdd = true
 				end
 			end
+			for i, interfaceDetails in ipairs(interfaces) do
+				typeOfTreeString = typeOfTreeString .. string.format("[%s]=1,", interfaceDetails.className)
+			end
 			local typeOfTreeID = nextID()
 			add(typeOfTreeString:sub(1,#typeOfTreeString - 1) .. "}", typeOfTreeID)
 			if didAdd then
@@ -728,6 +737,8 @@ for i, classDetails in pairs(classOrder) do
 		for i, str in ipairs(staticInitialiseStrings) do
 			add(unpack(str))
 		end
+	else
+		add("setmetatable(%s,{__index=%s,__newindex=%s})", className, functionErrorIDs.metatable.interface.index, functionErrorIDs.metatable.interface.newindex)
 	end
 end
 

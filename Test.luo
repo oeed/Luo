@@ -47,7 +47,7 @@ class Basic implements IThingy
 		return 42
 	end
 
-	function String aFunction(String first, String second, third, fourth)
+	function String aFunction(String first, String second, third)
 		return first .. second .. third
 	end
 
