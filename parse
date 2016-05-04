@@ -15,7 +15,7 @@ local startTime = os.clock()
 dofile("serialise")
 
 local LINE_START_POSITION = 1
-local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER, KEYWORD_RETURN, KEYWORD_DO = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super", "return", "do"
+local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER, KEYWORD_RETURN, KEYWORD_DO, KEYWORD_INTERFACE = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super", "return", "do", "interface"
 local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
 	[KEYWORD_PROPERTY] = true,
 	[KEYWORD_DEFAULT] = true,
@@ -667,25 +667,25 @@ for i, fileName in ipairs( args ) do
 		end
 	end
 
-	function jumpToKeyword( toKeyword )
+	function jumpToKeywords( toKeywords )
 		local keyword
 		local startLine, startLinePosition = currentLine, currentLinePosition
 		repeat 
 			keyword, isEndOfFile = nextName( true )
-		until not keyword or keyword == toKeyword
+		until not keyword or toKeywords[keyword]
 		local jumpedString = ""
 		for i = startLine, currentLine do
 			local line = lines[i]
 			local lineOut = ""
 			local lineComments = linesComments[i]
-			for n = (i == startLine and startLinePosition or 1), (i == currentLine and currentLinePosition - #toKeyword - 1 or #line) do
+			for n = (i == startLine and startLinePosition or 1), (i == currentLine and currentLinePosition - #keyword - 1 or #line) do
 				if not lineComments[n] then
 					lineOut = lineOut .. line:sub(n, n)
 				end
 			end
 			jumpedString = jumpedString .. lineOut .. "\n"
 		end
-		return toKeyword == keyword, jumpedString, startLine
+		return toKeywords[keyword], keyword, jumpedString, startLine
 	end
 
 	function isComment( lineNumber, linePosition )
@@ -718,10 +718,11 @@ for i, fileName in ipairs( args ) do
 		fileName = fileName
 	}
 	fileEnvironments[i] = fileEnvironment
+	local isInterface = false
 	while not isEndOfFile and not ( currentLinePosition > currentLineLength and currentLine + 1 > linesCount ) do
 		if blockLevel == BLOCK_LEVEL_NONE then
 			-- we're expecting a class definition
-			local didJump, jumpedString, startLine = jumpToKeyword( KEYWORD_CLASS, position, line )
+			local didJump, keyword, jumpedString, startLine = jumpToKeywords( {[KEYWORD_CLASS] = true, [KEYWORD_INTERFACE] = true}, position, line )
 			if not jumpedString:match( "^(%s*)$" ) then
 				-- we only jumped more than just white space or nothing, it might be important
 				local existingLine = fileEnvironment[startLine]
@@ -734,30 +735,55 @@ for i, fileName in ipairs( args ) do
 			end
 			if didJump then
 				local className = demandImmediateNextName( "class name" )
-				currentClass = {
-					className = className,
-					instance = {
-						properties = {},
-						propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
-						defaultValues = {},
-						eventHandles = {},
-						functions = {},
-						instanceVariables = {}
-					},
-					static = {
-						properties = {},
-						propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
-						defaultValues = {},
-						eventHandles = {},
-						functions = {},
-						instanceVariables = {}
-					},
-					enums = {},
-					fileEnvironment = i,
-					lineNumber = currentLine
-				}
+				if keyword == KEYWORD_CLASS then
+					isInterface = false
+					currentClass = {
+						className = className,
+						instance = {
+							properties = {},
+							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
+							defaultValues = {},
+							eventHandles = {},
+							functions = {},
+							instanceVariables = {}
+						},
+						static = {
+							properties = {},
+							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
+							defaultValues = {},
+							eventHandles = {},
+							functions = {},
+							instanceVariables = {}
+						},
+						implements = {},
+						enums = {},
+						fileEnvironment = i,
+						lineNumber = currentLine
+					}
+				elseif keyword == KEYWORD_INTERFACE then
+					isInterface = true
+					currentClass = {
+						isInterface = true,
+						className = className,
+						instance = {
+							properties = {},
+							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
+							eventHandles = {},
+							functions = {},
+						},
+						static = {
+							properties = {},
+							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
+							eventHandles = {},
+							functions = {},
+						},
+						enums = {},
+						fileEnvironment = i,
+						lineNumber = currentLine
+					}
+				end
 				if parsed[className] then
-					parserError( "A class has already been defined with the name '" .. className .. "'. Class names must be unique." )
+					parserError( "A class/interface has already been defined with the name '" .. className .. "'. Class/interface names must be unique." )
 				end
 				blockLevel = BLOCK_LEVEL_CLASS
 				isClassDefinition = true
@@ -771,10 +797,24 @@ for i, fileName in ipairs( args ) do
 				-- we're expecting either the extends, implements, etc, statement OR a property declaration
 				local keyword = immediateNextName()
 				if keyword == KEYWORD_EXTENDS then
+					if isInterface then
+						parserError("attempted to extend interface '" .. currentClass.className .. "'. Interfaces cannot be extended.")
+					end
 					if currentClass.extends then
-						parserError( "class already extends '" .. "' " .. currentClass.extends .. ". Polyinheritance is not supported." )
+						parserError( "class already extends '" .. currentClass.extends .. "'. Polyinheritance is not supported." )
 					end
 					currentClass.extends = demandImmediateNextName()
+				elseif keyword == KEYWORD_IMPLEMENTS then
+					if isInterface then
+						parserError("attempted to implement another interface in interface '" .. currentClass.className .. "'. Interfaces cannot implement other interfaces.")
+					end
+					local implements = demandImmediateNextName()
+					for i, impl in ipairs(currentClass.implements) do
+						if impl == implements then
+							parserError( "duplicate interface implementation, class already implements '" .. impl .. "'." )
+						end
+					end
+					table.insert(currentClass.implements, implements)
 				elseif NON_CLASS_TYPE_DECLARATION_KEYWORDS[keyword] then
 					isClassDefinition = false
 					stepBack( keyword )
@@ -792,6 +832,9 @@ for i, fileName in ipairs( args ) do
 				elseif keyword == KEYWORD_STATIC then
 					isStatic = true
 				elseif keyword == KEYWORD_LOCAL then
+					if isInterface then
+						parserError("interfaces cannot defined instance variables.")
+					end
 					local name = demandImmediateNextName( "instance variable name" )
 
 					if isStatic then
@@ -828,8 +871,11 @@ for i, fileName in ipairs( args ) do
 					local hasEquals = isNext( "^(%s*)=(%s*)", true )
 					local values
 					if hasEquals then
+						if isInterface then
+							parserError("interfaces cannot define enum values.")
+						end
 						values = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
-					else
+					elseif not isInterface then
 						parserError( "expected table of enum values" )
 					end
 
@@ -867,6 +913,9 @@ for i, fileName in ipairs( args ) do
 					local hasEquals = isNext( "^(%s*)=(%s*)", true )
 					local defaultValue
 					if hasEquals then
+						if isInterface then
+							parserError("interfaces cannot set default property values.")
+						end
 						defaultValue = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
 					end
 
@@ -883,6 +932,9 @@ for i, fileName in ipairs( args ) do
 						currentClass.instance.properties[name] = propertyTable
 					end
 				elseif keyword == KEYWORD_DEFAULT then
+					if isInterface then
+						parserError("interfaces cannot set default property values.")
+					end
 					local name = demandImmediateNextName( "property name" )
 					local hasEquals = isNext( "^(%s*)=(%s*)", true )
 					if hasEquals then
@@ -908,13 +960,23 @@ for i, fileName in ipairs( args ) do
 					end
 					captureSingleParameter( keyword == KEYWORD_GET and "" or name )
 
-					local block, startLine = captureBlock()
-					propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
+					
+					if not isInterface then
+						local block, startLine = captureBlock()
+						propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
+					else
+						propertyMethodTable[name] = true
+					end
 				elseif keyword == KEYWORD_EVENT then
 					local name = demandImmediateNextName( "event function handle name" )
 					local eventClass, eventPhase, parameterName = captureEventParameter()
-					local block, startLine = captureBlock()
-					local eventTable = { "(__CLASS__self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase }
+					local eventTable
+					if not isInterface then
+						local block, startLine = captureBlock()
+						eventTable = { "(__CLASS__self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase }
+					else
+						eventTable = { eventClass, eventPhase }
+					end
 					if isStatic then
 						currentClass.static.eventHandles[name] = eventTable
 					else
@@ -1047,12 +1109,17 @@ for i, fileName in ipairs( args ) do
 						hasNext = isNext( "^%s*%,", true )
 					until not hasNext
 					isNext( "^%s*%)", true ) -- capture the trailing bracket
-					local block, startLine = captureReturnsBlock()
-					local functionString = "(__CLASS__self_passed"
-					for i, parameter in ipairs( parameters ) do
-						functionString = functionString  .. "," .. parameter.name
+					local functionTable
+					if not isInterface then
+						local block, startLine = captureReturnsBlock()
+						local functionString = "(__CLASS__self_passed"
+						for i, parameter in ipairs( parameters ) do
+							functionString = functionString  .. "," .. parameter.name
+						end
+						functionTable = { functionString .. ")", block, startLine, parameters, returnTypes }
+					else
+						functionTable = { parameters, returnTypes }
 					end
-					local functionTable = { functionString .. ")", block, startLine, parameters, returnTypes }
 					if isStatic then
 						currentClass.static.functions[name] = functionTable
 					else

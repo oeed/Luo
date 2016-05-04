@@ -1,6 +1,21 @@
 
 ONE, TWO, THREE = "1", "2", "3"
 
+interface IThingy
+
+	enum Number numbers
+
+	property Boolean calledInitialise
+	property Number initialiseArgsCount
+	property String aSetter
+	property String aGetter
+
+	set aSetter(aSetter)
+	get aGetter()
+
+	function String aFunction(String first, String second, third)
+end
+
 class Basic
 
 	enum Number numbers = {
