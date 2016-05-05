@@ -42,7 +42,16 @@ testFV("Subclass Super-and-sub Defined Getters", function() child.aGetter = "HEL
 testV("Subclass Super-only Defined Functions", child:aFunction("one", "two", "three"), "onetwothree")
 testV("Subclass Both-and-sub Defined Functions", child:aSuperFunction("this"), "THISextra7")
 
+testM("Interface __tostring", tostring(IThingy), "interface 'IThingy': 0x%x+")
+
+
 -- bad default value testing
 testFM("Invalid Default Value Catching", function()return pcall(function()InvalidDefault() end)end, false, ".+:%d+: default value of property 'aBadDefault' of 'instance of 'InvalidDefault': 0x%x+' was an invalid value 'nope', expected type 'Number'")
 
+testV("TypeOf Class Checking", typeOf(child, Child), true)
+testV("TypeOf Super-Class Checking", typeOf(child, Basic), true)
+testV("TypeOf Unrelated Class Checking", typeOf(basic, Child), false)
+testV("TypeOf Implemented Interface Checking", typeOf(basic, IThingy), true)
+testV("TypeOf Super-Implemented Interface Checking", typeOf(child, IThingy), true)
+print(IThingy)
 testsDone()

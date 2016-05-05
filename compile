@@ -112,6 +112,9 @@ add("local %s=setmetatable({},{__mode=\"k\"})", instancesID)
 local staticInstancesID = nextID()
 add("local %s=setmetatable({},{__mode=\"k\"})", staticInstancesID)
 
+-- add the type of function
+add("function typeOf(i,t)local j=%s[i]if j then return j[t] and true or false else local s=%s[i]if s then return s[t] and true or false end return false end end ", instancesID, staticInstancesID)
+
 local classNamesIDs = {}
 for className, _ in pairs(parsed) do
 	local id = nextID()
@@ -729,9 +732,11 @@ for i, classDetails in pairs(classOrder) do
 					superNamesString = superNamesString .. string.format("%s,", classNamesIDs[superName])
 					didAdd = true
 				end
-			end
-			for i, interfaceDetails in ipairs(interfaces) do
-				typeOfTreeString = typeOfTreeString .. string.format("[%s]=1,", interfaceDetails.className)
+
+				-- add the interfaces
+				for i, interfaceName in ipairs(superDetails.implements) do
+					typeOfTreeString = typeOfTreeString .. string.format("[%s]=1,", interfaceName)
+				end
 			end
 			local typeOfTreeID = nextID()
 			add(typeOfTreeString:sub(1,#typeOfTreeString - 1) .. "}", typeOfTreeID)
