@@ -748,7 +748,7 @@ for i, classDetails in pairs(classOrder) do
 			end
 		end
 	else
-		add("setmetatable(%s,{__index=%s,__newindex=%s})", className, functionErrorIDs.metatable.interface.index, functionErrorIDs.metatable.interface.newindex)
+		add("setmetatable(%s,{__index=%s,__newindex=%s,__tostring=function()return %s end})", className, functionErrorIDs.metatable.interface.index, functionErrorIDs.metatable.interface.newindex, classTostringIDs[className])
 	end
 end
 
