@@ -18,13 +18,17 @@ go()]]), env)
 --   return "a" + 2  -- will cause error
 -- end -- f
 
-local __CLASS__error_proxy = function(name, startLine, func)
-	return select(2, xpcall(func,  function(err)
-		local _, trace = pcall(error, "<@", 3)
-		local lineNumber = trace:match(":(%d+): <@")
-		print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
-	end))
-end
+-- local __CLASS__error_proxy = function(name, startLine, func)
+-- 	return select(2, xpcall(func,  function(err)
+-- 		local _, trace = pcall(error, "<@", 3)
+-- 		local lineNumber = trace:match(":(%d+): <@")
+-- 		print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+-- 	end))
+-- end
 
-print(__CLASS__error_proxy("name", 15, f))
+-- print(__CLASS__error_proxy("name", 15, f))
 
+print(pcall(function()
+	g = "h" + 5
+	return "one", "two"
+end))

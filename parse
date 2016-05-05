@@ -606,6 +606,7 @@ for i, fileName in ipairs( args ) do
 	function captureReturnsBlock()
 		local keyword
 		local block = {}
+		local blockStartLine = currentLine
 		local startLine, startLinePosition = currentLine, currentLinePosition
 		local level = 1
 		local function addPassed()
@@ -659,7 +660,7 @@ for i, fileName in ipairs( args ) do
 				level = level + 1
 			end
 		until level == 0
-		return block, startLine
+		return block, blockStartLine
 	end
 
 	function demandParameters()

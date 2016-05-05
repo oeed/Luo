@@ -75,6 +75,10 @@ class Basic implements IThingy
 		return "wow"
 	end
 
+	function crash()
+		local v = "h" + 5
+	end
+
 	function initialise(...)
 		self.calledInitialise = true
 		self.initialiseArgsCount = #{...}

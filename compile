@@ -44,13 +44,37 @@ local function addFunction(str, ...)
 	return functionID
 end
 
+
+local lineNumberMap = {}
+local lineNumberingOutputLine, lineNumberingSourceFile, lineNumberingSourceLine
+-- add a line number anchor
+local function startLineNumbering(sourceFile, sourceLine)
+	sourceFile = fileEnvironments[sourceFile].fileName
+	local outputLine = 1
+	for i in string.gmatch(file, "\n") do
+	   outputLine = outputLine + 1
+	end
+	if lineNumberMap[outputLine] then
+		error("duplicate error line on " .. outputLine)
+	else
+		lineNumberingOutputLine, lineNumberingSourceFile, lineNumberingSourceLine = outputLine, sourceFile, sourceLine
+	end
+end
+
+-- fill from the first line number anchor up to where we are now
+local function stopLineNumbering()
+	local outputLine = 1
+	for i in string.gmatch(file, "\n") do
+	   outputLine = outputLine + 1
+	end
+	add("\n")
+	for i = 0, outputLine - lineNumberingOutputLine do
+		lineNumberMap[lineNumberingOutputLine + i] = lineNumberingSourceFile .. ":" .. lineNumberingSourceLine + i .. ":"
+	end
+	lineNumberingOutputLine, lineNumberingSourceFile, lineNumberingSourceLine = nil, nil, nil
+end
+
 -- first add all the built in functions
-
--- local lineNumberMap = {}
--- local function addLineNumber(funcID, file, startLine)
--- 	insert(lineNumberMap
--- end
-
 local functionErrorID = addFunction([[(m)error(m,3)end]])
 
 local functionErrorIDs = {
@@ -441,7 +465,9 @@ for i, classDetails in pairs(classOrder) do
 						end
 					end
 				end
-				add("local function %s(self,super)return function%s%s%s end ", functionID, functionDetails[1], typeChecking, functionBody)
+				startLineNumbering(classDetails.fileEnvironment, functionDetails[3])
+				add("local function %s(self,super)return function%s%s%s end", functionID, functionDetails[1], typeChecking, functionBody)
+				stopLineNumbering()
 				functionIDs[functionName] = functionID
 			end
 			classDetails[mode].functionIDs = functionIDs
@@ -794,6 +820,21 @@ end
 -- initialise the statics
 for i, initialiseString in ipairs(staticInitialiseStrings) do
 	add(unpack(initialiseString))
+end
+
+-- add the error map
+local lineNumberString = "local %s={"
+didAdd = false
+for lineNumber, errorPrefix in pairs(lineNumberMap) do
+	lineNumberString = lineNumberString .. string.format("[%q]=%q,", lineNumber, errorPrefix)
+	didAdd = true
+end
+if didAdd then
+	local lineNumberID = nextID()
+	add(lineNumberString:sub(1, #lineNumberString - 1) .. "}", lineNumberID)
+	local filePathID = nextID()
+	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
+	add([[function catchErrors(f,...)local a = {...}local r = {pcall(function()return f(unpack(a))end)}if not r[1] then local e = r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end]], filePathID, lineNumberID)
 end
 
 print("Compile complete, saving...")
