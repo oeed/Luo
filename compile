@@ -177,7 +177,7 @@ local classesID = nextID()
 add(classesString .. "}", classesID)
 
 local classesEnumIDs = {}
-local classesEnumTostringIDs = {}
+local classesEnumTypeOfTableIDs = {}
 local functionTypeCheckIDs = {
 	[true] = {}, [false] = {}
 }
@@ -236,9 +236,11 @@ local function typeCheck(typeName, allowsNil)
 			if className and enumName then
 				-- this is an enum
 				local classEnumIDs = classesEnumIDs[className]
+				local classEnumTypeOfTableIDs = classesEnumTypeOfTableIDs[className]
 				if classEnumIDs then
-					local enumID = classesEnumIDs[className][enumName]
-					id = addFunction("(v)%sfor i,V in pairs(%s)do if V==v then return false end end return true end", allowsNilCheckReturnIf, enumID)
+					local enumID = classEnumIDs[enumName]
+					local typeOfTableID = classEnumTypeOfTableIDs[enumName]
+					id = addFunction("(v)return %snot %s[v] end", allowsNilCheckOr, typeOfTableID)
 				else
 				end
 			else
@@ -286,25 +288,26 @@ for i, classDetails in pairs(classOrder) do
 		local className = classDetails.className
 		-- create the enums
 		local enumIDs = {}
-		local enumTostringIDs = {}
+
+		local enumTypeOfTableIDs = {}
 		for enumName, content in pairs(classDetails.enums) do
-			-- create enum's value table
+			-- create enum's value table ids
 			local enumID = nextID()
 			enumIDs[enumName] = enumID
-			local enumTostringID = nextID()
-			enumTostringIDs[enumName] = enumTostringID
-			add("local %s=%s", enumID, content.values)
-			add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
-
-			-- check the default values of the enum
-			add("for k,v in pairs(%s)do if %s(v)then %s(%q,k,%q,v)end end ", enumID, typeCheck(content.type, false), functionErrorIDs.type.enum, className .. "." .. enumName, content.type)
+			add("local %s ", enumID)
+			local typeOfTableID = nextID()
+			add("local %s={}", typeOfTableID)
+			enumTypeOfTableIDs[enumName] = typeOfTableID
 		end
 		classesEnumIDs[className] = enumIDs
-		classesEnumTostringIDs[className] = enumTostringIDs
+		classesEnumTypeOfTableIDs[className] = enumTypeOfTableIDs
 	end
 end
 
 -- now create each class one by one
+local metatableStrings = {}
+local valueTableStrings = {}
+local staticInitialiseStrings = {}
 for i, classDetails in pairs(classOrder) do
 	local className = classDetails.className
 	if not classDetails.isInterface then
@@ -330,18 +333,14 @@ for i, classDetails in pairs(classOrder) do
 
 		-- create the enums
 		local enumIDs = classesEnumIDs[className]
-		local enumTostringIDs = classesEnumTostringIDs[className]
-
 		-- add the class' value table
 		local valueTableId = nextID()
 		local valueTableString = "local %s=setmetatable({static=%s"
 		for enumName, id in pairs(enumIDs) do
-			local tostringID = enumTostringIDs[enumName]
-			valueTableString = valueTableString .. string.format(",%s=setmetatable(%s,{__index=%s,__newindex=%s,__tostring=function()return %s end})", enumName, id, functionErrorIDs.metatable.enum.index, functionErrorIDs.metatable.enum.newindex, tostringID)
+			valueTableString = valueTableString .. string.format(",%s=%s", enumName, id)
 		end
-		add(valueTableString .. "},%s)", valueTableId, classStaticIDs[className], classMetatableMetatableID)
+		valueTableStrings[className] = {valueTableString .. "},%s)", valueTableId, classStaticIDs[className], classMetatableMetatableID}
 
-		local staticInitialiseStrings = {}
 		-- setup the instance and static values and functions
 		for mode, modeDetails in pairs({instance = classDetails.instance, static = classDetails.static}) do
 			-- create the detault values
@@ -743,15 +742,10 @@ for i, classDetails in pairs(classOrder) do
 
 			-- add the class metatable
 			if mode == "instance" then
-				add("setmetatable(%s,{__index=%s,__newindex=%s,", className, valueTableId, functionErrorIDs.metatable.class.newindex)
-				add("__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,", "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID)
-				add("__tostring=function()return %s end})", classTostringIDs[className])
+				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", className, valueTableId, functionErrorIDs.metatable.class.newindex, "__CLASS__instance_create", mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
 			elseif mode == "static" then
 				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)","__CLASS__instance_create", classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 			end
-		end
-		for i, str in ipairs(staticInitialiseStrings) do
-			add(unpack(str))
 		end
 	else
 		add("setmetatable(%s,{__index=%s,__newindex=%s})", className, functionErrorIDs.metatable.interface.index, functionErrorIDs.metatable.interface.newindex)
@@ -766,6 +760,35 @@ for i, blocks in ipairs(fileEnvironments) do
 			add("%s(%q,%d,setfenv(loadstring([[%s]]), %s))", functionErrorProxyID, blocks.fileName, startLine, escapeSquare(content), id)
 		end
 	end
+end
+
+-- load the enum values
+for i, classDetails in pairs(classOrder) do
+	if not classDetails.isInterface then
+		local className = classDetails.className
+		local enumIDs = classesEnumIDs[className]
+		local enumTypeOfTableIDs = classesEnumTypeOfTableIDs[className]
+		for enumName, content in pairs(classDetails.enums) do
+			-- create enum's value table
+			local enumTostringID = nextID()
+			local enumID = enumIDs[enumName]
+			add("%s=setfenv(loadstring([[return %s]]), %s)()", enumID, content.values, fileEnvironmentIDs[classDetails.fileEnvironment])
+			add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
+			add("setmetatable(%s,{__index=%s,__newindex=%s,__tostring=function()return %s end})", enumID, functionErrorIDs.metatable.enum.index, functionErrorIDs.metatable.enum.newindex, enumTostringID)
+
+			local typeOfTableID = enumTypeOfTableIDs[enumName]
+			-- check the default values of the enum and create the type of table
+			add("for k,v in pairs(%s)do if %s(v)then %s(%q,k,%q,v)end %s[v]=true end ", enumID, typeCheck(content.type, false), functionErrorIDs.type.enum, className .. "." .. enumName, content.type, typeOfTableID)
+		end
+		-- add the class' value table & metatable
+		add(unpack(valueTableStrings[className]))
+		add(unpack(metatableStrings[className]))
+	end
+end
+
+-- initialise the statics
+for i, initialiseString in ipairs(staticInitialiseStrings) do
+	add(unpack(initialiseString))
 end
 
 print("Compile complete, saving...")

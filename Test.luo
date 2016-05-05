@@ -1,5 +1,7 @@
 ONE, TWO, THREE = "1", "2", "3"
 
+EXTERNAL = 1
+
 interface IThingy
 
 	property Boolean calledInitialise
@@ -13,7 +15,7 @@ end
 class Basic implements IThingy
 
 	enum Number numbers = {
-		ONE = 1,
+		ONE = EXTERNAL,
 		TWO = 2,
 		THREE = 3
 	}
