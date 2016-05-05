@@ -1,4 +1,4 @@
-dofile("compile")
+dofile("luo")
 dofile("output.lua")
 dofile("test")
 print("\n")
