@@ -33,7 +33,6 @@ local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the
 
 local BLOCK_START_KEYWORDS = {
 	[KEYWORD_IF] = true,
-	[KEYWORD_FOR] = true,
 	[KEYWORD_DO] = true,
 	[KEYWORD_FUNCTION] = true
 }
