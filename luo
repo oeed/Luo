@@ -1113,10 +1113,12 @@ for i, fileName in ipairs( args ) do
 					if not isInterface then
 						local block, startLine = captureReturnsBlock()
 						local functionString = "(__CLASS__self_passed"
+						local parameterNames = {}
 						for i, parameter in ipairs( parameters ) do
 							functionString = functionString  .. "," .. parameter.name
+							table.insert(parameterNames, parameter.name)
 						end
-						functionTable = { functionString .. ")", block, startLine, parameters, returnTypes }
+						functionTable = { functionString .. ")", block, startLine, parameters, returnTypes, parameterNames }
 					else
 						functionTable = { parameters, returnTypes }
 					end
@@ -1140,6 +1142,10 @@ for i, fileName in ipairs( args ) do
 end
 
 print("Parsed in " .. os.clock() - parseStartTime .. "s!")
+dofile("serialise")
+local h = io.open("Parsed","w")
+h:write(serialise(parsed))
+h:close()
 
 -- END PARSER
 
@@ -1288,13 +1294,16 @@ add([[local function %s(instance, funcs, instanceEnvironment, supers, supers__to
 	local stack = {}
 	local n = 1
 	local f
-	for superI, func in pairs(funcs) do
-		if not isFirst then
-			stack[n] = {superI, func}
-			n = n + 1
-		else
-			f = func
-			isFirst = false
+	for i = 1, #supers + 1 do
+		local func = funcs[i]
+		if func then
+			if not isFirst then
+				stack[n] = {i, func}
+				n = n + 1
+			else
+				f = func
+				isFirst = false
+			end
 		end
 	end
 	for i = n - 1, 1, -1 do
@@ -1357,6 +1366,7 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 		end,
 		__tostring = function() return __tostring end
 	})
+
 	if defaultValues then
 		for k,v in pairs(defaultValues) do
 			local newValue = %s(v, environmentClass)
@@ -1677,12 +1687,38 @@ for i, classDetails in pairs(classOrder) do
 			end
 			add(defaultValuesTypesString .. "}", defaultValuesTypesID)
 
+			-- add the instance variables
+			local instanceVariablesID
+			local instanceVariablesString = "local %s={"
+			didAdd = false
+			local addedInstanceVariables = {}
+			for i, superDetails in ipairs(supersDetails) do
+				for variableName, content in pairs(superDetails[mode].instanceVariables) do
+					if not addedInstanceVariables[variableName] then
+						instanceVariablesString = instanceVariablesString .. string.format("[%q]=loadstring([[return %s]]),", variableName, escapeSquare(content))
+						didAdd = true
+						addedInstanceVariables[variableName] = true
+					end
+				end
+			end
+			if didAdd then
+				instanceVariablesID = nextID()
+				add(instanceVariablesString:sub(1,#instanceVariablesString - 1) .. "}", instanceVariablesID)
+			end
+
 			-- add the functions
 			local functionIDs = {}
 			local functionsTable = "local %s={"
 			local didAdd = false
 			local allFunctionNames = {} -- all of the function names defined by us and the supers
 			for functionName, functionDetails in pairs(modeDetails.functions) do
+				-- first check that none of the parameters have same name as an instance variable (which would cause name clashes)
+				for i, parameterName in ipairs(functionDetails[6]) do
+					if addedInstanceVariables[parameterName] then
+						error("compiler error: parameter '" .. parameterName .. "' of " .. mode .. " function '" .. functionName .. "' in class '" .. className .. "' has the same name as an instance variable. Parameters cannot use the name of an instance variable.")
+					end
+				end
+
 				-- add the actual function code
 				local functionID = nextID()
 				local typeChecking = ""
@@ -1697,6 +1733,7 @@ for i, classDetails in pairs(classOrder) do
 				local functionBody = ""
 				local returnTypes = functionDetails[5]
 				for n, part in ipairs(functionDetails[2]) do
+					-- return vaule types
 					if type(part) == "string" then
 						functionBody = functionBody .. part
 					elseif type(part) == "table" then
@@ -1814,6 +1851,10 @@ for i, classDetails in pairs(classOrder) do
 				-- we need to go backwards because properties should only be defined ONCE (i.e. if it tries to override then error)
 				local superDetails = supersDetails[i][mode]
 				for propertyName, propertyDetails in pairs(superDetails.properties) do
+					-- first check that the property doesn't have same name as an instance variable (which would cause name clashes)
+					if addedInstanceVariables[propertyName] then
+						error("compiler error: " .. mode .. " property '" .. propertyName .. "' of class '" .. supersDetails[i].className .. "' has the same name as an instance variable. Properties cannot use the name of an instance variable.")
+					end
 					-- then try to get the default from the property definitions
 					if flattenedProperties[propertyName] then
 						error("compiler error: attempted to redeclare " .. mode .. " property '" .. propertyName .. " in " .. className .. " which was already defined by super class '" .. supersDetails[i].className .. "'. Subclasses are not allowed to change or redeclare properties defined by a super class.")
@@ -1997,19 +2038,6 @@ for i, classDetails in pairs(classOrder) do
 				add(instanceNewindexTable:sub(1,#instanceNewindexTable - 1) .. "},%s)", instanceNewindexTableID, instanceMetatableMetatableID)
 			else
 				instanceIndexTableID, instanceNewindexTableID = instanceMetatableMetatableID, instanceMetatableMetatableID
-			end
-
-			-- add the instance variables
-			local instanceVariablesID
-			local instanceVariablesString = "local %s={"
-			didAdd = false
-			for variableName, content in pairs(classDetails[mode].instanceVariables) do
-				instanceVariablesString = instanceVariablesString .. string.format("[%q]=loadstring([[return %s]]),", variableName, escapeSquare(content))
-				didAdd = true
-			end
-			if didAdd then
-				instanceVariablesID = nextID()
-				add(instanceVariablesString:sub(1,#instanceVariablesString - 1) .. "}", instanceVariablesID)
 			end
 
 			-- create the typeof tree and the list of supers

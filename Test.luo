@@ -9,10 +9,13 @@ interface IThingy
 	property String aSetter
 	property String aGetter
 
-	function String aFunction(String first, String second, third)
+	function String aFunction(String second, third)
 end
 
 class Basic implements IThingy
+
+	local first = "first"
+	local other = "other"
 
 	enum Number numbers = {
 		ONE = EXTERNAL,
@@ -48,15 +51,15 @@ class Basic implements IThingy
 		return 42
 	end
 
-	function String aFunction(String first, String second, third)
+	function String aFunction(String second, third)
 		return first .. second .. third
 	end
 
-	function String aDefaultFunction(String first = ONE, String second = "2", third = THREE)
+	function String aDefaultFunction(String second = "2", third = THREE)
 		return first .. second .. third
 	end
 
-	function String aSuperFunction(String first, String second, third)
+	function String aSuperFunction(String second, third)
 		return first .. second .. tostring(third)
 	end
 
@@ -88,14 +91,16 @@ end
 
 class Child extends Basic
 	
+	local first = "last"
+
 	default aDefault = "a new default"
 
 	get aGetter()
 		return super()
 	end
 
-	function String aSuperFunction(String first)
-		return super(first:upper(), "extra", 7)
+	function String aSuperFunction(String extra)
+		return super(other .. extra:upper(), 7)
 	end
 
 end
