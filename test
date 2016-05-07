@@ -1,9 +1,14 @@
+local function fail(message)
+	local _, trace = pcall(error, "<@", 4)
+	print(trace:match("/([^/]+:%d+: )<@$") .. message)
+end
+
 local testCount = 0
 local testSuccesses = 0
 function testV(name, value, expected)
 	testCount = testCount + 1
 	if expected ~= value then
-		print("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected '" .. tostring(expected) .. "'")
+		fail("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected '" .. tostring(expected) .. "'")
 		return
 	end
 	print("Test Passed! ('" .. name .. "')")
@@ -15,7 +20,7 @@ function testM(name, value, pattern)
 	testCount = testCount + 1
 	local match = {value:match(pattern)}
 	if #match == 0 then
-		print("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected to match pattern '" .. tostring(pattern) .. "'")
+		fail("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected to match pattern '" .. tostring(pattern) .. "'")
 		return
 	end
 	print("Test Passed! ('" .. name .. "')")
@@ -28,12 +33,12 @@ function testFV(name, func, ...)
 	local expected = {...}
 	local returned = {func()}
 	if #expected ~= #returned then
-		print("Test Failed ('" .. name .. "'): expected " .. #expected .. " return values, got " .. #returned)
+		fail("Test Failed ('" .. name .. "'): expected " .. #expected .. " return values, got " .. #returned)
 		return
 	else
 		for i, v in ipairs(returned) do
 			if v ~= expected[i] then
-				print("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(expected[i]) .. "'")
+				fail("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(expected[i]) .. "'")
 				return
 			end
 		end
@@ -48,12 +53,12 @@ function testFM(name, func, ...)
 	local patterns = {...}
 	local returned = {func()}
 	if #patterns ~= #returned then
-		print("Test Failed ('" .. name .. "'): expected " .. #patterns .. " return values, got " .. #returned)
+		fail("Test Failed ('" .. name .. "'): expected " .. #patterns .. " return values, got " .. #returned)
 		return
 	else
 		for i, v in ipairs(returned) do
 			if (type(v) == "string" and not v:match(patterns[i])) or (type(v) ~= "string" and patterns[i] ~= v) then
-				print("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(patterns[i]) .. "'")
+				fail("Test Failed ('" .. name .. "'): return value #" .. i .. " was incorrect. Got '" .. tostring(v) .. "' expected '" .. tostring(patterns[i]) .. "'")
 				return
 			end
 		end
