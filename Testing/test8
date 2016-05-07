@@ -1,4 +1,4 @@
-loadfile("luo")("output.lua", "Test.luo")
+loadfile("../luo")("output.lua", "Test.luo")
 dofile("output.lua")
 dofile("test")
 print("\n")
@@ -10,6 +10,7 @@ testFM("Enum Value Add Prevention", function()return pcall(function()Basic.numbe
 
 -- basic instance tests
 local basic = Basic("hola", "aamigo", 3454)
+testM("Class __tostring", tostring(Basic), "class 'Basic': 0x%x+")
 testM("Instance Initialised & __tostring", tostring(basic), "instance of 'Basic': 0x%x+")
 testV("Instance Initialise Called", basic.calledInitialise, true)
 testV("Instance Initialise Arguments", basic.initialiseArgsCount, 3)

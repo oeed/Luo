@@ -1142,10 +1142,6 @@ for i, fileName in ipairs( args ) do
 end
 
 print("Parsed in " .. os.clock() - parseStartTime .. "s!")
-dofile("serialise")
-local h = io.open("Parsed","w")
-h:write(serialise(parsed))
-h:close()
 
 -- END PARSER
 
