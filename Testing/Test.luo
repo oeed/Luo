@@ -32,6 +32,8 @@ class Basic implements IThingy
 	property Number aNumber = 0
 	property String anInvalidGetter = "GO AWAY"
 	property String readOnly aReadOnly = "hello"
+	property aTypeless = "blah"
+	property readOnly aTypelessReadOnly = "hello"
 	property String aDefault = "this is a default value"
 	property String aPlainValue = "hello"
 

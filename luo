@@ -886,20 +886,32 @@ for i, fileName in ipairs( args ) do
 						values = values
 					}
 				elseif keyword == KEYWORD_PROPERTY then
-					local propertyType = demandNextType( "property type" )
-					local readOnly, allowsNil, link, name = false, false, false
-					repeat
-						local nextKeyword = demandImmediateNextName( "property type modifiers (readOnly, allowsNil, etc.) or property name" )
+					local nextKeyword = demandNextType( "property type" )
+					local readOnly, allowsNil, link, name, propertyType = false, false, false
+					while true do
 						if nextKeyword == KEYWORD_READONLY then
 							readOnly = true
 						elseif nextKeyword == KEYWORD_ALLOWSNIL then
 							allowsNil = true
 						elseif nextKeyword == KEYWORD_LINK then
 							link = true
+						elseif not nextKeyword then
+							-- no type
+							name = propertyType
+							propertyType = nil
+							if allowsNil then
+								error("compiler error: unnecessary allowsNil modifier on property '" .. name .. "' in class '" .. currentClass.className .. "'. Properties without a specified type automatically allow nil values.")
+							end
+							allowsNil = true
+							break
+						elseif not propertyType then
+							propertyType = nextKeyword
 						else
 							name = nextKeyword
+							break
 						end
-					until name
+						nextKeyword = immediateNextName( "property type modifiers (readOnly, allowsNil, etc.) or property name" )
+					end
 
 					if isStatic then
 						if currentClass.static.properties[name] then
@@ -1497,7 +1509,7 @@ local TYPE_ANY = "Any"
 local function typeCheck(typeName, allowsNil)
 	if allowsNil == nil then error("missing allowsNil value") end
 	-- allowsNil = allowsNil ~= nil and allowsNil or false
-	if typeName == TYPE_ANY and allowsNil then
+	if not typeName or (typeName == TYPE_ANY and allowsNil) then
 		return -- Any allowsNil doesn't do any type checking
 	end
 	local ids = functionTypeCheckIDs[allowsNil]
@@ -1563,6 +1575,7 @@ local functionBlankIndexID = nextID()
 add("local function %s(_,k,v)return v[k] end ", functionBlankIndexID)
 local functionBlankNewindexIDs = {[true]={},[false]={}}
 local function blankNewindexIDs(typeName, allowsNil)
+	if not typeName then typeName = TYPE_ANY allowsNil = true end
 	if functionBlankNewindexIDs[allowsNil][typeName] then
 		return functionBlankNewindexIDs[allowsNil][typeName]
 	else
@@ -1667,7 +1680,7 @@ for i, classDetails in pairs(classOrder) do
 					if not flattenedDefaultValues[propertyName] then
 						flattenedDefaultValues[propertyName] = propertyDetails.defaultValue
 					end
-					if not flattenedDefaultValuesTypes[propertyName] then
+					if not flattenedDefaultValuesTypes[propertyName] and propertyDetails.type then
 						flattenedDefaultValuesTypes[propertyName] = {propertyDetails.type, propertyDetails.allowsNil}
 					end
 				end
