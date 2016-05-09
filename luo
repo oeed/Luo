@@ -1997,6 +1997,10 @@ for i, classDetails in pairs(classOrder) do
 				end
 
 				if propertyDetails.readOnly then
+					if propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
+						-- the property is readonly, yet there are setter property methods
+						error("compiler error: property '" .. propertyName .. "' of class '" .. className .. "' has willSet, set or didSet property methods, but the property is read only. These methods will never be called, remove them from your code.")
+					end
 					instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionErrorIDs.readOnly)
 				elseif propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
 					instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,w,s,d,l)", propertyName)

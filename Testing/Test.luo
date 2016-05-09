@@ -31,7 +31,7 @@ class Basic implements IThingy
 	property String aNonNilable = "hello"
 	property Number aNumber = 0
 	property String anInvalidGetter = "GO AWAY"
-
+	property String readOnly aReadOnly = "hello"
 	property String aDefault = "this is a default value"
 	property String aPlainValue = "hello"
 
