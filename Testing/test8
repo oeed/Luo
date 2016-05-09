@@ -30,6 +30,7 @@ testFM("Instance Invalid Enum Type Catching", function()return pcall(function()b
 testV("Instance Function Default Values", basic:aDefaultFunction(), "first23")
 testFM("Instance Return Type Catching", function()return pcall(function()basic:wrongReturnType() end)end, false, ".+:%d+: return value 1 from function 'wrongReturnType' of 'instance of 'Basic': 0x%x+' was an invalid value 'Hello', expected type 'Number'")
 testFM("Instance Read-Only Write Catching", function()return pcall(function()basic.aReadOnly = "good bye" end)end, false, ".+:%d+: attempted to set read only property 'aReadOnly' of 'instance of 'Basic': 0x%x+' to 'good bye'")
+testFM("Instance Read-Only Reading", function()return pcall(function()local v = basic.aReadOnly end)end, true)
 
 
 -- super class testing
