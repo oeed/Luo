@@ -112,3 +112,5 @@ class InvalidDefault
 	property Number aBadDefault = "nope"
 
 end
+
+local c = Child()

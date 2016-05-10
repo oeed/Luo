@@ -2,7 +2,6 @@ loadfile("../luo")("output.lua", "Test.luo")
 dofile("output.lua")
 dofile("test")
 print("\n")
-
 -- enums
 testM("Enum Access", tostring(Basic.numbers), "enum 'Basic.numbers': 0x%x+")
 testV("Enum Indexing", Basic.numbers.TWO, 2)

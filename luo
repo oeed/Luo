@@ -532,7 +532,7 @@ for i, fileName in ipairs( args ) do
 		if match then
 			return match, isTable
 		else
-			parserError( description .. " was expected immediately but wasn't found." )
+			parserError( description .. " was expected immediately but wasn't found (or the type was invalid)." )
 		end
 	end
 
@@ -679,13 +679,16 @@ for i, fileName in ipairs( args ) do
 		repeat 
 			keyword, isEndOfFile = nextName( true )
 		until not keyword or toKeywords[keyword]
+		if not keyword then
+			currentLine, currentLinePosition = #lines, #lines[#lines] + 1
+		end
 		local jumpedString = ""
 		for i = startLine, currentLine do
 			local line = lines[i]
 			local lineOut = ""
 			local lineComments = linesComments[i]
-			for n = (i == startLine and startLinePosition or 1), (i == currentLine and currentLinePosition - #keyword - 1 or #line) do
-				if not lineComments[n] then
+			for n = (i == startLine and startLinePosition or 1), (i == currentLine and currentLinePosition - (keyword and #keyword or 0) - 1 or #line) do
+				if not lineComments or not lineComments[n] then
 					lineOut = lineOut .. line:sub(n, n)
 				end
 			end
@@ -1273,7 +1276,7 @@ local functionErrorProxyID = addFunction([[(name, startLine, func)
 		local lineNumber = trace:match(":(%%d+): <@")
 		if not lineNumber then print(err)
 		else
-			print(name .. ":" .. lineNumber + startLine - 1 .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+			print(name .. ":" .. lineNumber + startLine .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
 		end
 	end))
 end]])
