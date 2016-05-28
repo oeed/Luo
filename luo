@@ -598,7 +598,7 @@ for i, fileName in ipairs( inputPaths ) do
 		local startLine, startLinePosition = currentLine, currentLinePosition
 		local level = 1
 		repeat 
-			keyword = nextMatch( "(%l+)" )
+			keyword = nextMatch( "%f[%a](%l+)%f[%A]" )
 			if not keyword then
 				parserError( "expected 'end' keyword to complete function" )
 			elseif keyword == KEYWORD_END then
@@ -629,6 +629,7 @@ for i, fileName in ipairs( inputPaths ) do
 		local blockStartLine = currentLine
 		local startLine, startLinePosition = currentLine, currentLinePosition
 		local level = 1
+		local innerFunctionLevels = {} -- the levels of functions defined within the function
 		local function addPassed()
 			local contents = ""
 			for i = startLine, currentLine do
@@ -645,15 +646,16 @@ for i, fileName in ipairs( inputPaths ) do
 		end
 		repeat 
 			local priorLine, priorPosition = currentLine, currentLinePosition
-			keyword = nextMatch( "(%l+)" )
+			keyword = nextMatch( "%f[%a](%l+)%f[%A]" )
 			if not keyword then
 				parserError( "expected 'end' keyword to complete function" )
 			elseif keyword == KEYWORD_END then
+				innerFunctionLevels[level] = nil
 				level = level - 1
 				if level == 0 then
 					table.insert(block, addPassed())
 				end
-			elseif keyword == KEYWORD_RETURN then
+			elseif keyword == KEYWORD_RETURN and not next(innerFunctionLevels) then -- only capture the return if its not of an inner defined function
 				-- capture everything up and and including the return
 				local returnLinePosition = currentLinePosition
 				currentLinePosition = currentLinePosition - #KEYWORD_RETURN - 1
@@ -678,6 +680,9 @@ for i, fileName in ipairs( inputPaths ) do
 				startLine, startLinePosition = currentLine, currentLinePosition
 			elseif BLOCK_START_KEYWORDS[keyword] then
 				level = level + 1
+				if keyword == KEYWORD_FUNCTION then
+					innerFunctionLevels[level] = true
+				end
 			end
 		until level == 0
 		return block, blockStartLine
@@ -1174,11 +1179,13 @@ for i, fileName in ipairs( inputPaths ) do
 			end
 		end
 	end
+	if blockLevel ~= BLOCK_LEVEL_NONE then
+		parserError("Expecting " .. blockLevel .. " more 'end' keyword" .. (blockLevel == 1 and "" or "s") .. "." )
+	end
 	print( "Parsed '" .. fileName .. "' without error in " .. os.clock() - fileStartTime .. "s!" )
 end
 
 print("Parsed in " .. os.clock() - parseStartTime .. "s!")
-
 -- END PARSER
 
 -- BEGIN COMPILER
