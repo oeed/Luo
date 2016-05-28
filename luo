@@ -7,6 +7,8 @@ if #args < 2 then
 	error("Parameters: luo <output file> <input file> <input file> etc...")
 end
 
+local lfs = require( "lfs" )
+ 
 local outputPath = args[1]
 table.remove(args, 1)
 
@@ -69,7 +71,26 @@ local IDENTIFIER_BLOCK_COMMENT_START, IDENTIFIER_BLOCK_STRING_START, IDENTIFIER_
 local parsed = {}
 local fileEnvironments = {}
 
-for i, fileName in ipairs( args ) do
+local inputPaths = {}
+local function addFileName(fileName)
+	local attributes = lfs.attributes(fileName)
+	if attributes.mode == "directory" then
+		for file in lfs.dir(fileName) do
+		    -- add files ending in .luo
+		    local extension = file:match( "%.(%w-)$" )
+		    if extension and extension:lower() == "luo" then
+		    	addFileName(fileName .. "/" .. file)
+		    end
+		end
+	else
+		table.insert(inputPaths, fileName)
+	end
+end
+for i, fileName in ipairs(args) do
+	addFileName(fileName)
+end
+
+for i, fileName in ipairs( inputPaths ) do
 	local fileStartTime = os.clock()
 	local file = io.open( fileName, "r" )
 	if not file then
@@ -91,9 +112,9 @@ for i, fileName in ipairs( args ) do
 		lineNumber = lineNumber or currentLine
 		linePosition = linePosition or currentLinePosition
 		if lineNumber > #lines then
-			error( "Parse error: " .. message )
+			error( "Parse error: " .. fileName .. ": " .. message )
 		else
-			error( "Parse error: " .. message .. "\n" ..
+			error( "Parse error: " .. fileName .. ": " .. message .. "\n" ..
 				( lineNumber > 2 and lineNumber - 1 .. ": " .. lines[lineNumber - 1] .. "\n" or "" ) ..
 				lineNumber .. ": " .. lines[lineNumber]:gsub("\t", " ") .. "\n" ..
 				string.rep( " ", #tostring( lineNumber ) + 2 + linePosition ) .. "^" ..
