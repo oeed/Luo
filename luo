@@ -1268,8 +1268,8 @@ local functionErrorIDs = {
 			newindex = addFunction([[(_,k)%s("attempted to mutate interface '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
 		},
 		instance = {
-			index = addFunction([[(_,k)%s("attempted to access non-existant property '"..k.."' of '"..tostring(_).."'")end]], functionErrorID),
-			newindex = addFunction([[(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
+			index = addFunction([[()return function(_,k)%s("attempted to access non-existant property '"..k.."' of '"..tostring(_).."'")end end]], functionErrorID),
+			newindex = addFunction([[()return function(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end end]], functionErrorID)
 		},
 		func = {
 			newindex = addFunction([[(_,k,v)%s("attempted to set value of function '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
