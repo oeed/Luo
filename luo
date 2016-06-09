@@ -7,7 +7,10 @@ if #args < 2 then
 	error("Parameters: luo <output file> <input file> <input file> etc...")
 end
 
-local lfs = require( "lfs" )
+local lfs
+if require then
+	lfs = require( "lfs" )
+end
  
 local outputPath = args[1]
 table.remove(args, 1)
@@ -73,14 +76,23 @@ local fileEnvironments = {}
 
 local inputPaths = {}
 local function addFileName(fileName)
-	local attributes = lfs.attributes(fileName)
-	if attributes.mode == "directory" then
-		for file in lfs.dir(fileName) do
-		    -- add files ending in .luo
-		    local extension = file:match( "%.(%w-)$" )
-		    if extension and extension:lower() == "luo" then
-		    	addFileName(fileName .. "/" .. file)
-		    end
+	if fs and fs.isDir(fileName) or lfs.attributes(fileName).mode == "directory" then
+		if fs then
+			for i, file in ipairs(fs.list(fileName)) do
+			    -- add files ending in .luo
+			    local extension = file:match( "%.(%w-)$" )
+			    if extension and extension:lower() == "luo" then
+			    	addFileName(fileName .. "/" .. file)
+			    end
+			end
+		else
+			for file in lfs.dir(fileName) do
+			    -- add files ending in .luo
+			    local extension = file:match( "%.(%w-)$" )
+			    if extension and extension:lower() == "luo" then
+			    	addFileName(fileName .. "/" .. file)
+			    end
+			end
 		end
 	else
 		table.insert(inputPaths, fileName)
