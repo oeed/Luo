@@ -76,7 +76,7 @@ local fileEnvironments = {}
 
 local inputPaths = {}
 local function addFileName(fileName)
-	if fs and fs.isDir(fileName) or lfs.attributes(fileName).mode == "directory" then
+	if fs and fs.isDir(fileName) or (lfs and lfs.attributes(fileName).mode == "directory") then
 		if fs then
 			for i, file in ipairs(fs.list(fileName)) do
 			    -- add files ending in .luo
