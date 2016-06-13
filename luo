@@ -153,7 +153,13 @@ for i, fileName in ipairs( inputPaths ) do
 		findAll( line, "%[%[", positions, IDENTIFIER_BLOCK_STRING_START )
 		findAll( line, "\"", positions, IDENTIFIER_DOUBLE_STRING )
 		findAll( line, "'", positions, IDENTIFIER_SINGLE_STRING )
-		findAll( line, "\\[\"\']", positions, IDENTIFIER_ESCAPE )
+		findAll( line, "\\[\"\'\\]", positions, IDENTIFIER_ESCAPE )
+		for i, v in pairs(positions) do
+			if v == "\\" then
+				-- strip out any double slashes
+				positions[i] = nil
+			end
+		end
 		findAll( line, "%-%-", positions, IDENTIFIER_COMMENT )
 		local lineLength = #line
 		local stringPositions, commentPositions = {}, {}
