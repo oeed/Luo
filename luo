@@ -475,22 +475,85 @@ for i, fileName in ipairs( inputPaths ) do
 	-- capture the expression until one of the delimeters are reached and return it with comments removed
 	function firstExpression( delimiters )
 		local line = getLine()
+		local startLine, startLinePosition = currentLine, currentLinePosition
+		local endTokens = {}
+		local stop = false
+		repeat
+			local match = nextMatch( "([%w%(%)%[%]%{%}]+)" )
+			if not match then
+				parserError("Expected end or property/function declaration")
+			end
+			local matches = {}
+			while #match > 0 do
+				local keyword = match:match("^(%w+)")
+				if keyword then
+					if #endTokens == 0 and NON_CLASS_TYPE_DECLARATION_KEYWORDS[keyword] then
+						stop = true
+						stepBack(keyword)
+						break
+					elseif BLOCK_START_KEYWORDS[keyword] then
+						table.insert( endTokens, KEYWORD_END )
+					elseif keyword == KEYWORD_END then
+						if endTokens[#endTokens] == KEYWORD_END then
+							endTokens[#endTokens] = nil
+						else
+							parserError("Brackets/end mismatch, expected " .. KEYWORD_END .. " got " .. keyword)
+						end
+					end
+					match = match:sub(#keyword + 1)
+				else
+					local bracket = match:match("^([%(%)%[%]%{%}]+)")
+					if bracket then
+						table.insert( matches, {bracket, false} )
+						for i = 1, #bracket do
+							local char = bracket:sub(i, i)
+							local top = endTokens[#endTokens]
+							if char == top then
+								endTokens[#endTokens] = nil
+							elseif char == ")" or char == "}" or char == "]" then
+								parserError("Brackets/end mismatch, expected " .. top .. " got " .. char)
+							elseif char == "(" then
+								table.insert(endTokens, ")")
+							elseif char == "{" then
+								table.insert(endTokens, "}")
+							elseif char == "[" then
+								table.insert(endTokens, "]")
+							end
+						end
+						match = match:sub(#bracket + 1)
+					else
+						error("Something messed up...")
+					end
+				end
+			end
+		until stop
 
 		local capturedLines, capturedLineStarts, startLine, endLine = captureToKeywords( delimiters )
 		local expression = ""
-		for _, lineNumber in ipairs( capturedLines ) do
-			local startPos = capturedLineStarts[lineNumber]
-			local stopPos = lineNumber == endLine and startPos or math.huge
-			startPos = lineNumber == endLine and 1 or startPos
-			local line = lines[lineNumber]
-			local lineNoComment = ""
-			local commentPositions, lineLength = linesCommentsPositions[lineNumber], #line
-			if startPos ~= stopPos then
-				for i = 0, #commentPositions / 2 + 1, 2 do
-					local start, stop = commentPositions[i] or 1, commentPositions[i + 1] or lineLength + 1
-					lineNoComment = lineNoComment .. line:sub( math.max( start, startPos), math.min( stop, stopPos) - 1 )
+
+		if startLine ~= currentLine or startLinePosition ~= currentLinePosition then
+			local capturedLineStarts = {}
+			local capturedLines = {}
+			for i = startLine, currentLine do
+				table.insert( capturedLines, i )
+				local line = lines[i]
+				local commentPositions, commentsOrStrings, lineLength = linesCommentsPositions[i], linesCommentsOrStrings[i], #line
+				local lineNoComment = ""
+				local startPos, stopPos
+				if i == currentLine then
+					startPos = 1
+					stopPos = currentLinePosition
+				else
+					startPos = i == startLine and startLinePosition or 1
+					stopPos = math.huge
 				end
-				expression = expression .. lineNoComment
+				if startPos ~= stopPos then
+					for i = 0, #commentPositions / 2 + 1, 2 do
+						local start, stop = commentPositions[i] or 1, commentPositions[i + 1] or lineLength + 1
+						lineNoComment = lineNoComment .. line:sub( math.max( start, startPos), math.min( stop, stopPos) - 1 )
+					end
+				end
+				expression = expression .. lineNoComment .. "\n"
 			end
 		end
 		return expression
