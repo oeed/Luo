@@ -512,7 +512,7 @@ for i, fileName in ipairs( inputPaths ) do
 							if char == top then
 								endTokens[#endTokens] = nil
 							elseif char == ")" or char == "}" or char == "]" then
-								parserError("Brackets/end mismatch, expected " .. top .. " got " .. char)
+								parserError("Brackets/end mismatch, expected " .. (top and top or "nothing") .. " got " .. char)
 							elseif char == "(" then
 								table.insert(endTokens, ")")
 							elseif char == "{" then
