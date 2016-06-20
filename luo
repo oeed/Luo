@@ -528,7 +528,6 @@ for i, fileName in ipairs( inputPaths ) do
 			end
 		until stop
 
-		local capturedLines, capturedLineStarts, startLine, endLine = captureToKeywords( delimiters )
 		local expression = ""
 
 		if startLine ~= currentLine or startLinePosition ~= currentLinePosition then
@@ -999,6 +998,10 @@ for i, fileName in ipairs( inputPaths ) do
 					local nextKeyword = demandNextType( "property type" )
 					local readOnly, allowsNil, link, name, propertyType = false, false, false
 					while true do
+						if NON_CLASS_TYPE_DECLARATION_KEYWORDS[nextKeyword] then
+							stepBack(nextKeyword)
+							nextKeyword = nil
+						end
 						if nextKeyword == KEYWORD_READONLY then
 							readOnly = true
 						elseif nextKeyword == KEYWORD_ALLOWSNIL then
@@ -1090,15 +1093,13 @@ for i, fileName in ipairs( inputPaths ) do
 					local block, startLine = captureBlock()
 					propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
 				elseif keyword == KEYWORD_EVENT then
+					if isInterface then
+						parserError("interfaces cannot event handles.")
+					end
 					local name = demandImmediateNextName( "event function handle name" )
 					local eventClass, eventPhase, parameterName = captureEventParameter()
-					local eventTable
-					if not isInterface then
-						local block, startLine = captureBlock()
-						eventTable = { "(__CLASS__self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase }
-					else
-						eventTable = { eventClass, eventPhase }
-					end
+					local block, startLine = captureBlock()
+					local eventTable = { "(__CLASS__self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase, parameterName }
 					if isStatic then
 						currentClass.static.eventHandles[name] = eventTable
 					else
@@ -1448,7 +1449,7 @@ add([[local function %s(instance, funcs, instanceEnvironment, supers, supers__to
 	return setfenv(f(instance, superFuncs[1]), instanceEnvironment)
 end
 
-local function %s(instance, instanceType, instanceVariables, instanceFunctions, defaultValues, defaultTypes, environmentClass, name, instance__index, instance__newindex, supers_names, propertyMethodFunctions, typeOfTree, ...)
+local function %s(instance, instanceType, instanceVariables, instanceFunctions, instanceEventHandles defaultValues, defaultTypes, environmentClass, name, instance__index, instance__newindex, supers_names, propertyMethodFunctions, typeOfTree, ...)
 	(instanceType == "static" and %s or %s)[instance] = typeOfTree -- instancesID/staticInstancesID
 	local instanceEnvironment
 	if instanceVariables then
@@ -1531,6 +1532,13 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 		end
 	end
 
+	local eventHandles = {}
+	values.__CLASS__eventHandles = eventHandles
+	if instanceEventHandles then
+		for k, funcs in pairs(instanceEventHandles) do
+			eventHandles[k] = %s(instance, funcs, instanceEnvironment, supers, supers__tostrings)
+		end
+	end
 
 	if instanceFunctions then
 		for k, funcs in pairs(instanceFunctions) do
@@ -1962,6 +1970,60 @@ for i, classDetails in pairs(classOrder) do
 				end
 			end
 
+
+
+			-- add the event methods
+			local eventIDs = {}
+			local eventsTable = "local %s={"
+			local didAdd = false
+			local allEventHandleNames = {} -- all of the function names defined by us and the supers
+			for handleName, handleDetails in pairs(modeDetails.eventHandles) do
+				local functionPrefix, functionBody, startLine, eventClass, eventPhase, eventPhase, parameterName = handleDetails[1], handleDetails[2], handleDetails[3], handleDetails[4], handleDetails[5], handleDetails[6], handleDetails[7]
+
+				-- first check that none of the parameters have same name as an instance variable (which would cause name clashes)
+				if addedInstanceVariables[parameterName] then
+					error("compiler error: parameter '" .. parameterName .. "' of " .. mode .. " event method '" .. handleName .. "' in class '" .. className .. "' has the same name as an instance variable. Parameters cannot use the name of an instance variable.")
+				end
+
+				-- add the actual function code
+				local functionID = nextID()
+				startLineNumbering(classDetails.fileEnvironment, startLine)
+				add("local function %s(self,super)return function%s%s end", functionID, functionPrefix, functionBody)
+				stopLineNumbering()
+				eventIDs[handleName] = functionID
+			end
+			classDetails[mode].eventIDs = eventIDs
+			for i, superDetails in ipairs(supersDetails) do
+				for handleName, id in pairs(superDetails[mode].eventIDs) do
+					allEventHandleNames[handleName] = true
+				end
+			end
+			for handleName, _ in pairs(allEventHandleNames) do
+				-- create the functions table (the list of the function and all its supers)
+				local eventsTableString = string.format("[%q]={", handleName)
+				local isConsecutive = true
+				for i, superDetails in ipairs(supersDetails) do
+					local superFunctionID = superDetails[mode].eventIDs[handleName]
+					if superFunctionID then
+						-- this super class has another version of the same function
+						if isConsecutive then
+							eventsTableString = eventsTableString .. string.format("%s,", superFunctionID)
+						else
+							eventsTableString = eventsTableString .. string.format("[%d]=%s,", i, superFunctionID)
+						end
+					else
+						isConsecutive = false
+					end
+				end
+				eventsTable = eventsTable .. eventsTableString .. "},"
+				didAdd = true
+			end
+			local eventsTableID
+			if didAdd then
+				eventsTableID = nextID()
+				add(eventsTable:sub(1,#eventsTable - 1) .. "}", eventsTableID)
+			end
+
 			-- add the properties
 			-- start the index metatable
 			local propertyMethodIDs = {}
@@ -2197,9 +2259,9 @@ for i, classDetails in pairs(classOrder) do
 
 			-- add the class metatable
 			if mode == "instance" then
-				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", className, valueTableId, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
+				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", className, valueTableId, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
 			elseif mode == "static" then
-				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
+				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 			end
 		end
 	else
