@@ -234,13 +234,13 @@ for i, fileName in ipairs( inputPaths ) do
 		table.insert( linesCommentsPositions, commentPositions )
 
 		local comments, strings, commentsOrStrings = {}, {}, {} -- a table where, for each position (index), it is true if there is a comment or string in that position
-		for i = 1, #stringPositions / 2, 2 do
+		for i = 1, #stringPositions, 2 do
 			for j = stringPositions[i], stringPositions[i + 1] do
 				commentsOrStrings[j] = true
 				strings[j] = true
 			end
 		end
-		for i = 1, #commentPositions / 2, 2 do
+		for i = 1, #commentPositions, 2 do
 			for j = commentPositions[i], commentPositions[i + 1] do
 				commentsOrStrings[j] = true
 				comments[j] = true
