@@ -20,7 +20,7 @@ local parseStartTime = os.clock()
 print("Starting parse...")
 
 local LINE_START_POSITION = 1
-local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER, KEYWORD_RETURN, KEYWORD_DO, KEYWORD_INTERFACE = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super", "return", "do", "interface"
+local KEYWORD_CLASS, KEYWORD_EXTENDS, KEYWORD_PROPERTY, KEYWORD_DEFAULT, KEYWORD_SET, KEYWORD_DIDSET, KEYWORD_WILLSET, KEYWORD_GET, KEYWORD_EVENT, KEYWORD_FUNCTION, KEYWORD_STATIC, KEYWORD_EXTENDS, KEYWORD_IMPLEMENTS, KEYWORD_READONLY, KEYWORD_ALLOWSNIL, KEYWORD_LINK, KEYWORD_END, KEYWORD_IF, KEYWORD_FOR, KEYWORD_WHILE, KEYWORD_FUNCTION, KEYWORD_LOCAL, KEYWORD_ENUM, KEYWORD_SUPER, KEYWORD_RETURN, KEYWORD_DO, KEYWORD_INTERFACE, KEYWORD_ELSE = "class", "extends", "property", "default", "set", "didSet", "willSet", "get", "event", "function", "static", "extends", "implements", "readOnly", "allowsNil", "link", "end", "if", "for", "while", "function", "local", "enum", "super", "return", "do", "interface", "else"
 local NON_CLASS_TYPE_DECLARATION_KEYWORDS = { -- keywords that indicate that the class definition has finished (i.e. not extends, implements, etc.)
 	[KEYWORD_PROPERTY] = true,
 	[KEYWORD_DEFAULT] = true,
@@ -159,6 +159,7 @@ for i, fileName in ipairs( inputPaths ) do
 			if v == "\\" then
 				-- strip out any double slashes
 				positions[i] = nil
+				positions[i + 1] = nil
 			end
 		end
 		findAll( line, "%-%-", positions, IDENTIFIER_COMMENT )
@@ -415,7 +416,7 @@ for i, fileName in ipairs( inputPaths ) do
 					end
 					if not foundMatch then
 						local priorLine, priorPosition = currentLine, currentLinePosition
-						if isNext("^(%s*" .. KEYWORD_END .. ")", true) then
+						if isNext("^(%s*" .. KEYWORD_END .. ")", true) or isNext("^(%s*" .. KEYWORD_ELSE .. ")", true) then
 							blockLevel = blockLevel - 1
 							if blockLevel < 0 then
 								currentLine, currentLinePosition = priorLine, priorPosition
@@ -850,55 +851,58 @@ for i, fileName in ipairs( inputPaths ) do
 				end
 			end
 			if didJump then
-				local className = demandImmediateNextName( "class name" )
-				if keyword == KEYWORD_CLASS then
-					isInterface = false
-					currentClass = {
-						className = className,
-						instance = {
-							properties = {},
-							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
-							defaultValues = {},
-							eventHandles = {},
-							functions = {},
-							instanceVariables = {}
-						},
-						static = {
-							properties = {},
-							propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
-							defaultValues = {},
-							eventHandles = {},
-							functions = {},
-							instanceVariables = {}
-						},
-						implements = {},
-						enums = {},
-						fileEnvironment = i,
-						lineNumber = currentLine
-					}
-				elseif keyword == KEYWORD_INTERFACE then
-					isInterface = true
-					currentClass = {
-						isInterface = true,
-						className = className,
-						instance = {
-							properties = {},
-							eventHandles = {},
-							functions = {},
-						},
-						static = {
-							properties = {},
-							eventHandles = {},
-							functions = {},
-						},
-						enums = {}
-					}
+				local className = immediateNextName( "class name" )
+				-- if there is a class name it is a declaration, otherwise just ignore it
+				if className then
+					if keyword == KEYWORD_CLASS then
+						isInterface = false
+						currentClass = {
+							className = className,
+							instance = {
+								properties = {},
+								propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
+								defaultValues = {},
+								eventHandles = {},
+								functions = {},
+								instanceVariables = {}
+							},
+							static = {
+								properties = {},
+								propertyMethods = {[KEYWORD_SET] = {},[KEYWORD_DIDSET] = {},[KEYWORD_WILLSET] = {},[KEYWORD_GET] = {}},
+								defaultValues = {},
+								eventHandles = {},
+								functions = {},
+								instanceVariables = {}
+							},
+							implements = {},
+							enums = {},
+							fileEnvironment = i,
+							lineNumber = currentLine
+						}
+					elseif keyword == KEYWORD_INTERFACE then
+						isInterface = true
+						currentClass = {
+							isInterface = true,
+							className = className,
+							instance = {
+								properties = {},
+								eventHandles = {},
+								functions = {},
+							},
+							static = {
+								properties = {},
+								eventHandles = {},
+								functions = {},
+							},
+							enums = {}
+						}
+					end
+					if parsed[className] then
+						parserError( "A class/interface has already been defined with the name '" .. className .. "'. Class/interface names must be unique." )
+					end
+					blockLevel = BLOCK_LEVEL_CLASS
+					isClassDefinition = true
 				end
-				if parsed[className] then
-					parserError( "A class/interface has already been defined with the name '" .. className .. "'. Class/interface names must be unique." )
-				end
-				blockLevel = BLOCK_LEVEL_CLASS
-				isClassDefinition = true
 			else
 				-- we're not in a class block, we can ignore this line
 				break
