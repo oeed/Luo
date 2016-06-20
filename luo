@@ -74,14 +74,15 @@ local IDENTIFIER_BLOCK_COMMENT_START, IDENTIFIER_BLOCK_STRING_START, IDENTIFIER_
 local parsed = {}
 local fileEnvironments = {}
 
+local isDir = fs and fs.isDir or (lfs and function(fileName)return lfs.attributes(fileName).mode == "directory"end)
 local inputPaths = {}
 local function addFileName(fileName)
-	if fs and fs.isDir(fileName) or (lfs and lfs.attributes(fileName).mode == "directory") then
+	if isDir(fileName) then
 		if fs then
 			for i, file in ipairs(fs.list(fileName)) do
 			    -- add files ending in .luo
 			    local extension = file:match( "%.(%w-)$" )
-			    if extension and extension:lower() == "luo" then
+			    if (extension and extension:lower() == "luo") or isDir(fileName) then
 			    	addFileName(fileName .. "/" .. file)
 			    end
 			end
@@ -89,7 +90,7 @@ local function addFileName(fileName)
 			for file in lfs.dir(fileName) do
 			    -- add files ending in .luo
 			    local extension = file:match( "%.(%w-)$" )
-			    if extension and extension:lower() == "luo" then
+			    if (extension and extension:lower() == "luo") or isDir(fileName) then
 			    	addFileName(fileName .. "/" .. file)
 			    end
 			end
