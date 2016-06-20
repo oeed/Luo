@@ -1054,6 +1054,9 @@ for i, fileName in ipairs( inputPaths ) do
 						link = link,
 						defaultValue = defaultValue
 					}
+					if not name then
+						parserError("Invalid property declaration, no name found")
+					end
 					if isStatic then
 						currentClass.static.properties[name] = propertyTable
 					else
