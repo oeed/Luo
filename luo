@@ -295,9 +295,9 @@ for i, fileName in ipairs( inputPaths ) do
 
 	function nextMatch( match, index, allowEndOfFile )
 		index = index or 3
-		local keyword
+		local keyword, matches
 		repeat
-			keyword, _, endOfFile = firstMatch( match, index, allowEndOfFile )
+			keyword, matches, endOfFile = firstMatch( match, index, allowEndOfFile )
 			if endOfFile then
 				return nil, true
 			end
@@ -311,7 +311,7 @@ for i, fileName in ipairs( inputPaths ) do
 			end
 			error( "unexpected end of file" )
 		end
-		return keyword
+		return keyword, nil, matches
 	end
 
 	function firstMatch( match, index, allowEndOfFile )
@@ -481,7 +481,14 @@ for i, fileName in ipairs( inputPaths ) do
 		local endTokens = {}
 		local stop = false
 		repeat
+			-- TODO: Font.static.something matches as a keyword, check whether it's surrounded by whitespace or something
+			-- local isStartClear = (
 			local match = nextMatch( "([%w%(%)%[%]%{%}]+)" )
+			local _line = lines[currentLine]
+			local firstChar = _line and _line:sub(currentLinePosition - #match - 1, currentLinePosition - #match - 1) or ""
+			local isStartClear = (#firstChar == 0 or firstChar:match("^[%s%}%)%];,]$") ~= nil)
+			local lastChar = _line and _line:sub(currentLinePosition, currentLinePosition) or ""
+			local isEndClear = (#lastChar == 0 or lastChar:match("^[%s%{%(%[;,]$") ~= nil)
 			if not match then
 				parserError("Expected end or property/function declaration")
 			end
@@ -489,7 +496,8 @@ for i, fileName in ipairs( inputPaths ) do
 			while #match > 0 do
 				local keyword = match:match("^(%w+)")
 				if keyword then
-					if #endTokens == 0 and NON_CLASS_TYPE_DECLARATION_KEYWORDS[keyword] then
+					if not isStartClear or (#keyword == #match and not isEndClear) then
+					elseif #endTokens == 0 and NON_CLASS_TYPE_DECLARATION_KEYWORDS[keyword] then
 						stop = true
 						stepBack(keyword)
 						break
@@ -527,6 +535,7 @@ for i, fileName in ipairs( inputPaths ) do
 						error("Something messed up...")
 					end
 				end
+				isStartClear = true -- as we've passed the start chunk we can assume that the start is clear
 			end
 		until stop
 
