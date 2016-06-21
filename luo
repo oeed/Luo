@@ -1572,7 +1572,7 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 		initialiseFunction(instance,...)
 	end
 	return instance
-end ]], localiseFunctionsID, functionErrorIDs.metatable.super.newindex, functionErrorIDs.metatable.super.newindex, instanceCreateID, instancesID, staticInstancesID, functionExecuteID, functionExecuteID, functionErrorIDs.type.default, localiseFunctionsID, localiseFunctionsID)
+end ]], localiseFunctionsID, functionErrorIDs.metatable.super.newindex, functionErrorIDs.metatable.super.newindex, instanceCreateID, instancesID, staticInstancesID, functionExecuteID, functionExecuteID, functionErrorIDs.type.default, localiseFunctionsID, localiseFunctionsID, localiseFunctionsID)
 
 -- now add the file environments
 local fileEnvironmentIDs = {}
