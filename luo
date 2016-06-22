@@ -2197,7 +2197,7 @@ for i, classDetails in pairs(classOrder) do
 					instanceIndexTable = instanceIndexTable .. string.format("[%q]=function(_,k,v,g,l)", propertyName)
 					instanceIndexTable = instanceIndexTable .. "if l[k]then return v[k]else l[k]=true "
 					instanceIndexTable = instanceIndexTable .. "local v=g[k](_)l[k]=nil "
-					if propertyDetails.type ~= TYPE_ANY or not propertyDetails.allowsNil then
+					if (propertyDetails.type and propertyDetails.type ~= TYPE_ANY) or not propertyDetails.allowsNil then
 						instanceIndexTable = instanceIndexTable .. string.format("if %s(v)then %s(_,k,%q,v)end ", typeCheck(propertyDetails.type, propertyDetails.allowsNil), functionErrorIDs.type.returned.get, propertyDetails.type .. (propertyDetails.allowsNil and " (allowsNil)" or ""))
 					end
 					instanceIndexTable = instanceIndexTable .. "return v end end,"
@@ -2214,7 +2214,7 @@ for i, classDetails in pairs(classOrder) do
 					instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=%s,", propertyName, functionErrorIDs.readOnly)
 				elseif propertyMethods and (propertyMethods.set or propertyMethods.didSet or propertyMethods.willSet) then
 					instanceNewindexTable = instanceNewindexTable .. string.format("[%q]=function(_,k,n,v,w,s,d,l)", propertyName)
-					if propertyDetails.type ~= TYPE_ANY or not propertyDetails.allowsNil then
+					if (propertyDetails.type and propertyDetails.type ~= TYPE_ANY) or not propertyDetails.allowsNil then
 						instanceNewindexTable = instanceNewindexTable .. string.format("if %s(n)then %s(_,k,%q,n)end ", typeCheck(propertyDetails.type, propertyDetails.allowsNil), functionErrorIDs.type.property, propertyDetails.type .. (propertyDetails.allowsNil and " (allowsNil)" or ""))
 					end
 					instanceNewindexTable = instanceNewindexTable .. "if l[k]then v[k]=n else l[k]=true "
