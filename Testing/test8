@@ -46,6 +46,10 @@ testFV("Subclass Super-and-sub Defined Getters", function() child.aGetter = "HEL
 testV("Subclass Super-only Defined Functions", child:aFunction("two", "three"), "lasttwothree")
 testV("Subclass Both-and-sub Defined Functions", child:aSuperFunction("extra"), "lastotherEXTRA7")
 testM("Interface __tostring", tostring(IThingy), "interface 'IThingy': 0x%x+")
+testFM("Instance Type Assignment", function()return pcall(function()child.basic = basic end)end, true)
+local anotherChild = Child()
+testFM("Super Instance Type Assignment", function()return pcall(function()child.basic = anotherChild end)end, true)
+testFM("Invalid Instance Type Assignment", function()return pcall(function()child.basic = "Hello!" end)end, false, ".+:%d+: attempted to set property 'basic' of 'instance of 'Child': 0x%x+' to an invalid value 'Hello!', expected type 'Basic %(allowsNil%)'")
 
 -- bad default value testing
 testFM("Invalid Default Value Catching", function()return pcall(function()InvalidDefault() end)end, false, ".+:%d+: default value of property 'aBadDefault' of 'instance of 'InvalidDefault': 0x%x+' was an invalid value 'nope', expected type 'Number'")
