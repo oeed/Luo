@@ -127,11 +127,12 @@ for i, fileName in ipairs( inputPaths ) do
 		if lineNumber > #lines then
 			error( "Parse error: " .. fileName .. ": " .. message )
 		else
+			print(debug.traceback())
 			error( "Parse error: " .. fileName .. ": " .. message .. "\n" ..
 				( lineNumber > 2 and lineNumber - 1 .. ": " .. lines[lineNumber - 1] .. "\n" or "" ) ..
 				lineNumber .. ": " .. lines[lineNumber]:gsub("\t", " ") .. "\n" ..
 				string.rep( " ", #tostring( lineNumber ) + 2 + linePosition ) .. "^" ..
-				( lineNumber < #lines and "\n" .. lineNumber + 1 .. ": " .. lines[lineNumber + 1] .. "\n" or "" ), 2 )
+				( lineNumber < #lines and "\n" .. lineNumber + 1 .. ": " .. lines[lineNumber + 1] .. "\n" or "" ), 3 )
 		end
 	end
 
@@ -489,6 +490,12 @@ for i, fileName in ipairs( inputPaths ) do
 			local isStartClear = (#firstChar == 0 or firstChar:match("^[%s%}%)%];,]$") ~= nil)
 			local lastChar = _line and _line:sub(currentLinePosition, currentLinePosition) or ""
 			local isEndClear = (#lastChar == 0 or lastChar:match("^[%s%{%(%[;,]$") ~= nil)
+			-- if not isStartClear then
+			-- 	print("first: '" .. firstChar .. "'")
+			-- end
+			-- if not isEndClear then
+			-- 	print("last: '" .. lastChar .. "'")
+			-- end
 			if not match then
 				parserError("Expected end or property/function declaration")
 			end
@@ -1108,7 +1115,7 @@ for i, fileName in ipairs( inputPaths ) do
 					captureSingleParameter( keyword == KEYWORD_GET and "" or name )
 					
 					local block, startLine = captureBlock()
-					propertyMethodTable[name] = { "(__CLASS__self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
+					propertyMethodTable[name] = { "(_C_self_passed" .. ( keyword == KEYWORD_GET and "" or ( "," .. name ) ) .. ")" .. block, startLine }
 				elseif keyword == KEYWORD_EVENT then
 					if isInterface then
 						parserError("interfaces cannot event handles.")
@@ -1116,7 +1123,7 @@ for i, fileName in ipairs( inputPaths ) do
 					local name = demandImmediateNextName( "event function handle name" )
 					local eventClass, eventPhase, parameterName = captureEventParameter()
 					local block, startLine = captureBlock()
-					local eventTable = { "(__CLASS__self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase, parameterName }
+					local eventTable = { "(_C_self_passed," .. parameterName ..")", block, startLine, eventClass, eventPhase, parameterName }
 					if isStatic then
 						currentClass.static.eventHandles[name] = eventTable
 					else
@@ -1252,7 +1259,7 @@ for i, fileName in ipairs( inputPaths ) do
 					local functionTable
 					if not isInterface then
 						local block, startLine = captureReturnsBlock()
-						local functionString = "(__CLASS__self_passed"
+						local functionString = "(_C_self_passed"
 						local parameterNames = {}
 						for i, parameter in ipairs( parameters ) do
 							functionString = functionString  .. "," .. parameter.name
@@ -1281,7 +1288,7 @@ for i, fileName in ipairs( inputPaths ) do
 	if blockLevel ~= BLOCK_LEVEL_NONE then
 		parserError("Expecting " .. blockLevel .. " more 'end' keyword" .. (blockLevel == 1 and "" or "s") .. "." )
 	end
-	print( "Parsed '" .. fileName .. "' without error in " .. os.clock() - fileStartTime .. "s!" )
+	-- print( "Parsed '" .. fileName .. "' without error in " .. os.clock() - fileStartTime .. "s!" )
 end
 
 print("Parsed in " .. os.clock() - parseStartTime .. "s!")
@@ -1303,7 +1310,7 @@ local function escapeSquare(str)
 end
 
 local idN = 1
-local idPrefix = "__CLASS__"
+local idPrefix = "_C_"
 local idChars = {"0","1","2","3","4","5","6","7","8","9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"}
 local idCharsLength = #idChars
 local function nextID()
@@ -1317,12 +1324,11 @@ local function nextID()
 	return idPrefix .. id
 end
 
-local function addFunction(str, ...)
+local function addFunction(isLocal, str, ...)
 	local functionID = nextID()
-	add("local function %s%s ", functionID, string.format(str, ...))
+	add((isLocal and "local " or "") .. "function %s%s ", functionID, string.format(str, ...))
 	return functionID
 end
-
 
 local lineNumberMap = {}
 local lineNumberingOutputLine, lineNumberingSourceFile, lineNumberingSourceLine
@@ -1353,51 +1359,54 @@ local function stopLineNumbering()
 	lineNumberingOutputLine, lineNumberingSourceFile, lineNumberingSourceLine = nil, nil, nil
 end
 
+-- wrap the code to prevent global leaks
+add("setfenv(function()")
+
 -- first add all the built in functions
-local functionErrorID = addFunction([[(m)error(m,3)end]])
+local functionErrorID = addFunction(false,[[(m)error(m,3)end]])
 
 local functionErrorIDs = {
 	metatable = {
 		class = {
-			index = addFunction([[(_,k)%s("attempted to access non-existant enum '"..k.."' of class '"..tostring(_).."'")end]], functionErrorID),
-			newindex = addFunction([[(_,k,v)%s("attempted to mutate class '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
+			index = addFunction(false, [[(_,k)%s("attempted to access non-existant enum '"..k.."' of class '"..tostring(_).."'")end]], functionErrorID),
+			newindex = addFunction(false, [[(_,k,v)%s("attempted to mutate class '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
 		},
 		interface = {
-			index = addFunction([[(_)%s("attempted to access value from interface '"..tostring(_).."'")end]], functionErrorID),
-			newindex = addFunction([[(_,k)%s("attempted to mutate interface '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
+			index = addFunction(false, [[(_)%s("attempted to access value from interface '"..tostring(_).."'")end]], functionErrorID),
+			newindex = addFunction(false, [[(_,k)%s("attempted to mutate interface '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
 		},
 		instance = {
-			index = addFunction([[()return function(_,k)%s("attempted to access non-existant property '"..k.."' of '"..tostring(_).."'")end end]], functionErrorID),
-			newindex = addFunction([[()return function(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end end]], functionErrorID)
+			index = addFunction(false, [[()return function(_,k)%s("attempted to access non-existant property '"..k.."' of '"..tostring(_).."'")end end]], functionErrorID),
+			newindex = addFunction(false, [[()return function(_,k,v)%s("attempted to set non-existant property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end end]], functionErrorID)
 		},
 		func = {
-			newindex = addFunction([[(_,k,v)%s("attempted to set value of function '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
+			newindex = addFunction(false, [[(_,k,v)%s("attempted to set value of function '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID)
 		},
 		enum = {
-			index = addFunction([[(_,k)%s("attempted to access non-existant key '"..k.."' from enum '"..tostring(_).."'")end]], functionErrorID),
-			newindex = addFunction([[(_,k,v)%s("attempted to mutate enum '"..tostring(_).."' key '"..tostring(k).."' to '"..v.."'")end]], functionErrorID)
+			index = addFunction(false, [[(_,k)%s("attempted to access non-existant key '"..k.."' from enum '"..tostring(_).."'")end]], functionErrorID),
+			newindex = addFunction(false, [[(_,k,v)%s("attempted to mutate enum '"..tostring(_).."' key '"..tostring(k).."' to '"..v.."'")end]], functionErrorID)
 		},
 		super = {
-			index = addFunction([[(_,k)if k=="super"then %s("tried to access super of '" .. tostring(_) .. "', which does not have a super")else %s("attempted to access invalid index '" .. k .. "' of super '" .. tostring(_) .. "'")end end]], functionErrorID, functionErrorID),
-			newindex = addFunction([[(_,k,v)%s("attempted to mutate super '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
+			index = addFunction(false, [[(_,k)if k=="super"then %s("tried to access super of '" .. tostring(_) .. "', which does not have a super")else %s("attempted to access invalid index '" .. k .. "' of super '" .. tostring(_) .. "'")end end]], functionErrorID, functionErrorID),
+			newindex = addFunction(false, [[(_,k,v)%s("attempted to mutate super '"..tostring(_).."' using key '"..k.."'")end]], functionErrorID)
 		},
 	},
-	readOnly = addFunction([[(_,k,v)%s("attempted to set read only property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID),
+	readOnly = addFunction(false, [[(_,k,v)%s("attempted to set read only property '"..k.."' of '"..tostring(_).."' to '"..v.."'")end]], functionErrorID),
 	type = {
-		property = addFunction([[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
-		default = addFunction([[(_,k,t,v)%s("default value of property '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
-		parameter = addFunction([[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
-		enum = addFunction([[(_,k,t,v)%s("enum '".._.."' has an invalid value '"..tostring(v).."' for key '"..k.."', expected type '"..t.."'")end]], functionErrorID),
+		property = addFunction(false, [[(_,k,t,v)%s("attempted to set property '"..k.."' of '"..tostring(_).."' to an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		default = addFunction(false, [[(_,k,t,v)%s("default value of property '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		parameter = addFunction(false, [[(_,k,f,t,v)%s("attempted to pass parameter '"..k.."' of '"..tostring(_).."."..f.."' an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+		enum = addFunction(false, [[(_,k,t,v)%s("enum '".._.."' has an invalid value '"..tostring(v).."' for key '"..k.."', expected type '"..t.."'")end]], functionErrorID),
 		returned = {
-			get = addFunction([[(_,k,t,v)%s("return value from getter '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
-			func = addFunction([[(_,k,i,v,t)%s("return value "..i.." from function '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+			get = addFunction(false, [[(_,k,t,v)%s("return value from getter '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
+			func = addFunction(false, [[(_,k,i,v,t)%s("return value "..i.." from function '"..k.."' of '"..tostring(_).."' was an invalid value '"..tostring(v).."', expected type '"..t.."'")end]], functionErrorID),
 		}
 	}
 }
-local functionExecuteID = addFunction([[(f,e,...)return setfenv(f, e)(...)end]])
+local functionExecuteID = addFunction(false,[[(f,e,...)return setfenv(f, e)(...)end]])
 
 -- TODO: minify when it 100% works
-local functionErrorProxyID = addFunction([[(name, startLine, func)
+local functionErrorProxyID = addFunction(false,[[(name, startLine, func)
 	return select(2, xpcall(func,  function(err)
 		local _, trace = pcall(error, "<@", 3)
 		local lineNumber = trace:match(":(%%d+): <@")
@@ -1416,13 +1425,6 @@ add("local %s=setmetatable({},{__mode=\"k\"})", staticInstancesID)
 
 -- add the type of function
 add("function typeOf(i,t)local j=%s[i]if j then return j[t] and true or false else local s=%s[i]if s then return s[t] and true or false end return false end end ", instancesID, staticInstancesID)
-
-local classNamesIDs = {}
-for className, _ in pairs(parsed) do
-	local id = nextID()
-	classNamesIDs[className] = id
-	add("local %s=%q", id, className)
-end
 
 local instanceCreateID, localiseFunctionsID = nextID(), nextID()
 
@@ -1455,13 +1457,13 @@ add([[local function %s(instance, funcs, instanceEnvironment, supers, supers__to
 				if k == "super" then
 					return super
 				else
-					%s(_, k, v) -- __CLASS__error_function_super_no_index
+					%s(_, k, v) -- _C_error_function_super_no_index
 				end
 			end
 		else
 			__index = %s
 		end
-		superFuncs[i] = setmetatable({}, {__index = __index, __newindex = __CLASS__8, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
+		superFuncs[i] = setmetatable({}, {__index = __index, __newindex = _C_8, __tostring = supers__tostrings[superI], __call = function(_, ...)return func(super, ...) end})
 	end
 	return setfenv(f(instance, superFuncs[1]), instanceEnvironment)
 end
@@ -1485,7 +1487,7 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 			end
 		})
 		for k, v in pairs(instanceVariables) do
-			instanceEnvironment[k] = %s(v, environmentClass)
+			instanceEnvironment[k] = setfenv(v, environmentClass)()
 		end
 	else
 		instanceEnvironment = environmentClass
@@ -1507,7 +1509,7 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 
 	if defaultValues then
 		for k,v in pairs(defaultValues) do
-			local newValue = %s(v, environmentClass)
+			local newValue = setfenv(v, environmentClass)()
 			local neededType = defaultTypes[k]
 			if neededType and neededType[1](newValue) then
 				%s(instance,k,neededType[2],newValue)
@@ -1550,7 +1552,7 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 	end
 
 	local eventHandles = {}
-	values.__CLASS__eventHandles = eventHandles
+	values._C_eventHandles = eventHandles
 	if instanceEventHandles then
 		for k, funcs in pairs(instanceEventHandles) do
 			eventHandles[k] = %s(instance, funcs, instanceEnvironment, supers, supers__tostrings)
@@ -1572,14 +1574,14 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 		initialiseFunction(instance,...)
 	end
 	return instance
-end ]], localiseFunctionsID, functionErrorIDs.metatable.super.newindex, functionErrorIDs.metatable.super.newindex, instanceCreateID, staticInstancesID, instancesID, functionExecuteID, functionExecuteID, functionErrorIDs.type.default, localiseFunctionsID, localiseFunctionsID, localiseFunctionsID)
+end ]], localiseFunctionsID, functionErrorIDs.metatable.super.newindex, functionErrorIDs.metatable.super.newindex, instanceCreateID, staticInstancesID, instancesID, functionErrorIDs.type.default, localiseFunctionsID, localiseFunctionsID, localiseFunctionsID)
 
 -- now add the file environments
 local fileEnvironmentIDs = {}
 for i, blocks in ipairs(fileEnvironments) do
 	local id = nextID()
 	fileEnvironmentIDs[i] = id
-	add("local %s=setmetatable({},{__index=_G})", id)
+	add("%s=setmetatable({},{__index=_G})", id)
 end
 
 -- figure out the order that the classes need to be loaded (supers first)
@@ -1613,14 +1615,14 @@ for className, classDetails in pairs(parsed) do
 	-- TODO: maybe add an option which makes these locals?
 	didAdd = true
 	classesString = classesString .. string.format("[%s]=true,", className)
-	add("%s={}", className)
+	add("_G.%s={}", className)
 	local tostringID = nextID()
-	add("local %s=\"" .. (classDetails.isInterface and "interface" or "class") .. " '%s': \"..tostring(%s):sub(8)", tostringID, className, className)
+	add("%s=\"" .. (classDetails.isInterface and "interface" or "class") .. " '%s': \"..tostring(%s):sub(8)", tostringID, className, className)
 	classTostringIDs[className] = tostringID
 	if not classDetails.isInterface then
 		local staticID = nextID()
 		classStaticIDs[className] = staticID
-		add("local %s={}", staticID)
+		add("%s={}", staticID)
 	end
 end
 if didAdd then
@@ -1659,25 +1661,31 @@ local function typeCheck(typeName, allowsNil)
 	local allowsNilCheckReturnIf = allowsNil and "if v==nil then return false end " or ""
 	local allowsNilCheckReturnIfNotTable = allowsNil and "if v==nil then return false elseif type(v)~=\"table\" then return true end " or "if type(v)~=\"table\" then return true end "
 	if typeName == TYPE_ANY then
-		id = addFunction("(v)return v~=nil end")
+		id = addFunction(true,"(v)return v~=nil end")
 	elseif standardTypes[typeName] then
-		id = addFunction("(v)return %stype(v)~=\"%s\"end", allowsNilCheckOr, typeName:lower())
+		id = addFunction(true,"(v)return %stype(v)~=\"%s\"end", allowsNilCheckOr, typeName:lower())
 	elseif typeName == "Class" then -- this means a CLASS, not an instance, not a static instance, a plain old class
-		id = addFunction("(v)return %snot %s[v]or true end", allowsNilCheckOr, classesID)
+		id = addFunction(true,"(v)return %snot %s[v]end", allowsNilCheckOr, classesID)
+	elseif typeName == "Instance" then -- this means an INSTANCE, not a static instance or a class
+		id = addFunction(true,"(v)return %snot %s[v]end", allowsNilCheckOr, instancesID)
+	elseif typeName == "Static" then -- this means a STATIC instance, not a normal instance or a class
+		id = addFunction(true,"(v)return %snot %s[v]end", allowsNilCheckOr, staticInstancesID)
+	elseif typeName == "InstanceOrStatic" then -- this means a STATIC instance or a normal INSTANCE, not a class
+		id = addFunction(true,"(v)return %snot(%s[v]or %s[v])end", allowsNilCheckOr, staticInstancesID, instancesID)
 	elseif typeName:match("^[_%a][_%w]*$") then
 		if not standardTypes[typeName] and parsed[typeName] then
-			id = addFunction("(v)%slocal j=%s[v]return not(j and j[%s])end ", allowsNilCheckReturnIf, instancesID, typeName)
+			id = addFunction(false,"(v)%slocal j=%s[v]return not(j and j[%s])end ", allowsNilCheckReturnIf, instancesID, typeName)
 		else
 			error("compiler error: unknown instance type '" .. typeName .. "' (class isn't defined)")
 		end
 	elseif typeName:match("^{.+}$") then
 		local dictionaryTypeName1, dictionaryTypeName2 = typeName:match("^{([_%a][_%w]*)=([_%a][_%w]*)}$")
 		if dictionaryTypeName1 and dictionaryTypeName2 then
-			id = addFunction("(v)%sfor k,V in pairs(v)do if %s(k)or %s(V)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(dictionaryTypeName1, false), typeCheck(dictionaryTypeName2, false))
+			id = addFunction(false,"(v)%sfor k,V in pairs(v)do if %s(k)or %s(V)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(dictionaryTypeName1, false), typeCheck(dictionaryTypeName2, false))
 		else
 			local arrayTypeName = typeName:match("^{([_%a][_%w]*)}$")
 			if arrayTypeName then
-				id = addFunction("(v)%sfor i,V in pairs(v)do if %s(k)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(arrayTypeName, false))
+				id = addFunction(false,"(v)%sfor i,V in pairs(v)do if %s(k)then return true end end return false end", allowsNilCheckReturnIfNotTable, typeCheck(arrayTypeName, false))
 			end
 		end
 	else
@@ -1686,7 +1694,7 @@ local function typeCheck(typeName, allowsNil)
 			-- this is a static class
 			-- first check if that class name is defined
 			if not standardTypes[staticClassName] and parsed[staticClassName] then
-				id = addFunction("(v)%slocal j=%s[v]return not(j and j[%s])end ", allowsNilCheckReturnIf, staticInstancesID, staticClassName)
+				id = addFunction(false,"(v)%slocal j=%s[v]return not(j and j[%s])end ", allowsNilCheckReturnIf, staticInstancesID, staticClassName)
 			else
 				error("compiler error: unknown class type '" .. typeName .. "' (class isn't defined)")
 			end
@@ -1699,7 +1707,7 @@ local function typeCheck(typeName, allowsNil)
 				if classEnumIDs then
 					local enumID = classEnumIDs[enumName]
 					local typeOfTableID = classEnumTypeOfTableIDs[enumName]
-					id = addFunction("(v)return %snot %s[v] end", allowsNilCheckOr, typeOfTableID)
+					id = addFunction(false,"(v)return %snot %s[v] end", allowsNilCheckOr, typeOfTableID)
 				else
 				end
 			else
@@ -1715,7 +1723,7 @@ end
 
 -- the blank __index and __newindex functions for properties
 local functionBlankIndexID = nextID()
-add("local function %s(_,k,v)return v[k] end ", functionBlankIndexID)
+add("local function %s(_,k,v)return v[k] end ", functionBlankIndexID) -- KEEP LOCAL
 local functionBlankNewindexIDs = {[true]={},[false]={}}
 local function blankNewindexIDs(typeName, allowsNil)
 	if not typeName then typeName = TYPE_ANY allowsNil = true end
@@ -1726,12 +1734,12 @@ local function blankNewindexIDs(typeName, allowsNil)
 		functionBlankNewindexIDs[allowsNil][typeName] = id
 		if typeName == TYPE_ANY then
 			if allowsNil then
-				add("local function %s(_,k,n,v)v[k]=n end ", id)
+				add("local function %s(_,k,n,v)v[k]=n end ", id) -- KEEP LOCAL
 			else
-				add("local function %s(_,k,n,v)if n==nil then %s(_,k,%q,n)end v[k]=n end ", id, functionErrorIDs.type.property, typeName)
+				add("local function %s(_,k,n,v)if n==nil then %s(_,k,%q,n)end v[k]=n end ", id, functionErrorIDs.type.property, typeName) -- KEEP LOCAL
 			end
 		else
-			add("local function %s(_,k,n,v)if %s(n)then %s(_,k,%q,n)end v[k]=n end ", id, typeCheck(typeName, allowsNil), functionErrorIDs.type.property, typeName .. (allowsNil and " (allowsNil)" or ""))
+			add("function %s(_,k,n,v)if %s(n)then %s(_,k,%q,n)end v[k]=n end ", id, typeCheck(typeName, allowsNil), functionErrorIDs.type.property, typeName .. (allowsNil and " (allowsNil)" or ""))
 		end
 		return id
 	end
@@ -1770,7 +1778,7 @@ local valueTableStrings = {}
 local staticInitialiseStrings = {}
 for i, classDetails in pairs(classOrder) do
 	local className = classDetails.className
-	print("Compiling: " .. className)
+	-- print("Compiling: " .. className)
 	if not classDetails.isInterface then
 		local interfaces = {}
 		for i, interfaceName in ipairs(classDetails.implements) do
@@ -1795,11 +1803,12 @@ for i, classDetails in pairs(classOrder) do
 		local enumIDs = classesEnumIDs[className]
 		-- add the class' value table
 		local valueTableId = nextID()
-		local valueTableString = "local %s=setmetatable({static=%s"
+		local valueTableString = "setmetatable({static=%s"
 		for enumName, id in pairs(enumIDs) do
 			valueTableString = valueTableString .. string.format(",%s=%s", enumName, id)
 		end
-		valueTableStrings[className] = {valueTableString .. "},%s)", valueTableId, classStaticIDs[className], classMetatableMetatableID}
+		valueTableString = string.format(valueTableString .. "},%s)", valueTableId, classStaticIDs[className], classMetatableMetatableID)
+		-- valueTableStrings[className] = {valueTableString .. "},%s)", valueTableId, classStaticIDs[className], classMetatableMetatableID}
 
 		-- setup the instance and static values and functions
 		for mode, modeDetails in pairs({instance = classDetails.instance, static = classDetails.static}) do
@@ -1828,12 +1837,12 @@ for i, classDetails in pairs(classOrder) do
 					end
 				end
 			end
-			add("local %s={", defaultValuesID)
+			add("%s={", defaultValuesID)
 			for propertyName, defaultValue in pairs(flattenedDefaultValues) do
 				add("[%q]=loadstring(%q),", propertyName, "return " .. defaultValue)
 			end
 			add("}")
-			local defaultValuesTypesString = "local %s={"
+			local defaultValuesTypesString = "%s={"
 			for propertyName, typeDetails in pairs(flattenedDefaultValuesTypes) do
 				defaultValuesTypesString = defaultValuesTypesString .. string.format("[%q]={%s,%q},", propertyName, typeCheck(typeDetails[1], typeDetails[2]), typeDetails[1] .. (typeDetails[2] and " (allowsNil)" or ""))
 			end
@@ -1841,7 +1850,7 @@ for i, classDetails in pairs(classOrder) do
 
 			-- add the instance variables
 			local instanceVariablesID
-			local instanceVariablesString = "local %s={"
+			local instanceVariablesString = "%s={"
 			didAdd = false
 			local addedInstanceVariables = {}
 			for i, superDetails in ipairs(supersDetails) do
@@ -1860,7 +1869,7 @@ for i, classDetails in pairs(classOrder) do
 
 			-- add the functions
 			local functionIDs = {}
-			local functionsTable = "local %s={"
+			local functionsTable = "%s={"
 			local didAdd = false
 			local allFunctionNames = {} -- all of the function names defined by us and the supers
 			for functionName, functionDetails in pairs(modeDetails.functions) do
@@ -1879,7 +1888,10 @@ for i, classDetails in pairs(classOrder) do
 						typeChecking = typeChecking .. string.format("if %s==nil then %s=%s end ", argumentDetails.name, argumentDetails.name, argumentDetails.defaultValue, argumentDetails.name, argumentDetails.defaultValue)
 					end
 					if not argumentDetails.isVarArg and argumentDetails.type then
-						typeChecking = typeChecking .. string.format("if %s(%s)then %s(self,%q,%q,%q,%s)end ", typeCheck(argumentDetails.type, argumentDetails.allowsNil), argumentDetails.name, functionErrorIDs.type.parameter, argumentDetails.name, functionName, argumentDetails.type .. (argumentDetails.allowsNil and " (allowsNil)" or ""), argumentDetails.name)
+						local typeCheckFunction = typeCheck(argumentDetails.type, argumentDetails.allowsNil)
+						if typeCheckFunction then
+							typeChecking = typeChecking .. string.format("if %s(%s)then %s(self,%q,%q,%q,%s)end ", typeCheckFunction, argumentDetails.name, functionErrorIDs.type.parameter, argumentDetails.name, functionName, argumentDetails.type .. (argumentDetails.allowsNil and " (allowsNil)" or ""), argumentDetails.name)
+						end
 					end
 				end
 				local functionBody = ""
@@ -1926,7 +1938,7 @@ for i, classDetails in pairs(classOrder) do
 					end
 				end
 				startLineNumbering(classDetails.fileEnvironment, functionDetails[3])
-				add("local function %s(self,super)return function%s%s%s end", functionID, functionDetails[1], typeChecking, functionBody)
+				add("function %s(self,super)return function%s%s%s end", functionID, functionDetails[1], typeChecking, functionBody)
 				stopLineNumbering()
 				functionIDs[functionName] = functionID
 			end
@@ -1997,7 +2009,7 @@ for i, classDetails in pairs(classOrder) do
 
 			-- add the event methods
 			local eventIDs = {}
-			local eventsTable = "local %s={"
+			local eventsTable = "%s={"
 			local didAdd = false
 			local allEventHandleNames = {} -- all of the function names defined by us and the supers
 			for handleName, handleDetails in pairs(modeDetails.eventHandles) do
@@ -2011,7 +2023,7 @@ for i, classDetails in pairs(classOrder) do
 				-- add the actual function code
 				local functionID = nextID()
 				startLineNumbering(classDetails.fileEnvironment, startLine)
-				add("local function %s(self,super)return function%s%s end", functionID, functionPrefix, functionBody)
+				add("function %s(self,super)return function%s%s end", functionID, functionPrefix, functionBody)
 				stopLineNumbering()
 				eventIDs[handleName] = functionID
 			end
@@ -2063,7 +2075,7 @@ for i, classDetails in pairs(classOrder) do
 					end
 					-- then try to get the default from the property definitions
 					if flattenedProperties[propertyName] then
-						error("compiler error: attempted to redeclare " .. mode .. " property '" .. propertyName .. " in " .. className .. " which was already defined by super class '" .. supersDetails[i].className .. "'. Subclasses are not allowed to change or redeclare properties defined by a super class.")
+						error("compiler error: attempted to redeclare " .. mode .. " property '" .. propertyName .. "' in " .. className .. " which was already defined by a super class. Subclasses are not allowed to change or redeclare properties defined by a super class.")
 					else
 						flattenedProperties[propertyName] = propertyDetails
 					end
@@ -2112,7 +2124,7 @@ for i, classDetails in pairs(classOrder) do
 					end
 					if methodName then
 						local methodID = nextID()
-						add("local function %s(self,super)return function%s end ", methodID, methodDetails[1])
+						add("function %s(self,super)return function%s end ", methodID, methodDetails[1])
 						propertyMethodIDs[propertyName][methodName] = methodID
 					end
 				end
@@ -2144,7 +2156,7 @@ for i, classDetails in pairs(classOrder) do
 					didAddTable[methodName] = true
 				end
 			end
-			local propertyMethodsTable = "local %s={"
+			local propertyMethodsTable = "%s={"
 			didAdd = false
 			for methodName, didAddMethod in pairs(didAddTable) do
 				if didAddMethod then
@@ -2185,9 +2197,9 @@ for i, classDetails in pairs(classOrder) do
 
 			-- create the instance __index & __newindex methods for accessing properties and functions
 			local instanceIndexTableID
-			local instanceIndexTable = "local %s=setmetatable({"
+			local instanceIndexTable = "%s=setmetatable({"
 			local instanceNewindexTableID
-			local instanceNewindexTable = "local %s=setmetatable({"
+			local instanceNewindexTable = "%s=setmetatable({"
 			local didAdd = false
 			for propertyName, propertyDetails in pairs(flattenedProperties) do
 				local propertyMethods = flattenedPropertyMethods[propertyName]
@@ -2251,9 +2263,9 @@ for i, classDetails in pairs(classOrder) do
 			end
 
 			-- create the typeof tree and the list of supers
-			local typeOfTreeString = "local %s={"
+			local typeOfTreeString = "%s={"
 			local superNamesID
-			local superNamesString = "local %s={"
+			local superNamesString = "%s={"
 			didAdd = false
 			-- add the base classes & static instance
 			for i, superDetails in ipairs(supersDetails) do
@@ -2264,7 +2276,7 @@ for i, classDetails in pairs(classOrder) do
 					typeOfTreeString = typeOfTreeString .. string.format("[%s]=1,", classStaticIDs[superName])
 				end
 				if i ~= 1 then
-					superNamesString = superNamesString .. string.format("%s,", classNamesIDs[superName])
+					superNamesString = superNamesString .. string.format("%q,", superName)
 					didAdd = true
 				end
 
@@ -2282,10 +2294,10 @@ for i, classDetails in pairs(classOrder) do
 
 			-- add the class metatable
 			if mode == "instance" then
-				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", 
-				className, valueTableId, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
+				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", 
+				className, valueTableString, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
 			elseif mode == "static" then
-				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,...)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], classNamesIDs[className], instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
+				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 			end
 		end
 	else
@@ -2322,7 +2334,7 @@ for i, classDetails in pairs(classOrder) do
 			add("for k,v in pairs(%s)do if %s(v)then %s(%q,k,%q,v)end %s[v]=true end ", enumID, typeCheck(content.type, false), functionErrorIDs.type.enum, className .. "." .. enumName, content.type, typeOfTableID)
 		end
 		-- add the class' value table & metatable
-		add(unpack(valueTableStrings[className]))
+		-- add(unpack(valueTableStrings[className]))
 		add(unpack(metatableStrings[className]))
 	end
 end
@@ -2346,6 +2358,7 @@ if didAdd then
 	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
 	add([[function catchErrors(f,...)local a = {...}local r = {pcall(function()return f(unpack(a))end)}if not r[1] then local e = r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end]], filePathID, lineNumberID)
 end
+add("end, setmetatable({_G = _G, print=print}, __index=getfenv()))()")
 
 print("Compiled in " .. os.clock() - compileStartTime .. "s!")
 
