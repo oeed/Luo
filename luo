@@ -1707,10 +1707,11 @@ local function typeCheck(typeName, allowsNil)
 				if classEnumIDs then
 					local enumID = classEnumIDs[enumName]
 					local typeOfTableID = classEnumTypeOfTableIDs[enumName]
-					id = addFunction(false,"(v)return %snot %s[v] end", allowsNilCheckOr, typeOfTableID)
+					if typeOfTableID then
+						id = addFunction(false,"(v)return %snot %s[v] end", allowsNilCheckOr, typeOfTableID)
+					end
 				else
 				end
-			else
 			end
 		end
 	end
