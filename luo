@@ -399,17 +399,17 @@ for i, fileName in ipairs( inputPaths ) do
 		local startLine, startLinePosition = currentLine, currentLinePosition
 		local stopLine, stopLinePosition
 		local hasNext = false
+		local blockLevel = 0
 		repeat
 			local line = lines[lineIndex]
 			local commentsOrStrings = linesCommentsOrStrings[lineIndex]
-			local blockLevel = 0
 			local roundBracketLevel = 0
 			local curlyBracketLevel = 0
 			while true do
 				if not linesCommentsOrStrings[currentLine][currentLinePosition] then
 					local foundMatch = false
 					for keyword, _ in pairs(BLOCK_START_KEYWORDS) do
-						if isNext("^(%s*" .. keyword .. ")", true) then
+						if isNext("^%s*%f[%a](" .. keyword .. ")%f[%A]", true) then
 							blockLevel = blockLevel + 1
 							foundMatch = true
 							break
@@ -417,7 +417,7 @@ for i, fileName in ipairs( inputPaths ) do
 					end
 					if not foundMatch then
 						local priorLine, priorPosition = currentLine, currentLinePosition
-						if isNext("^(%s*" .. KEYWORD_END .. ")", true) or isNext("^(%s*" .. KEYWORD_ELSE .. ")", true) then
+						if isNext("^%s*%f[%a](" .. KEYWORD_END .. ")%f[%A]", true) or isNext("^%s*%f[%a](" .. KEYWORD_ELSE .. ")%f[%A]", true) then
 							blockLevel = blockLevel - 1
 							if blockLevel < 0 then
 								currentLine, currentLinePosition = priorLine, priorPosition
@@ -426,6 +426,7 @@ for i, fileName in ipairs( inputPaths ) do
 							end
 						else
 							local char = getLine():sub( 1, 1 )
+							local wasBracket = true
 							if char == "(" then
 								roundBracketLevel = roundBracketLevel + 1
 							elseif char == ")" then
@@ -434,12 +435,18 @@ for i, fileName in ipairs( inputPaths ) do
 								curlyBracketLevel = curlyBracketLevel + 1
 							elseif char == "}" then
 								curlyBracketLevel = curlyBracketLevel - 1
+							else
+								wasBracket = false
 							end
 							if char == "," and roundBracketLevel == 0 and curlyBracketLevel == 0 then
 								stopLine, stopLinePosition = priorLine, priorPosition
 								currentLinePosition = currentLinePosition + 1
 								hasNext = true
 								break
+							end
+							if not wasBracket then
+								-- was the keyword didn't match skip over the whole thing so we don't use part of a word as a keyword (i.e. cantExtend used as end)
+								isNext("^%s*[_%w]+", true)
 							end
 						end
 					end
