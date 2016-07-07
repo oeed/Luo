@@ -18,7 +18,7 @@ end
 
 function testM(name, value, pattern)
 	testCount = testCount + 1
-	local match = {value:match(pattern)}
+	local match = {value and value:match(pattern)}
 	if #match == 0 then
 		fail("Test Failed ('" .. name .. "'): value was incorrect. Got '" .. tostring(value) .. "' expected to match pattern '" .. tostring(pattern) .. "'")
 		return

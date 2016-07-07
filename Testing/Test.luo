@@ -96,6 +96,7 @@ class Child extends Basic
 	local first = "last"
 
 	default aDefault = "a new default"
+	property Basic allowsNil basic
 
 	get aGetter()
 		return super()
@@ -112,5 +113,3 @@ class InvalidDefault
 	property Number aBadDefault = "nope"
 
 end
-
-local c = Child()

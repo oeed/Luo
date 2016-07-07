@@ -82,7 +82,7 @@ local function addFileName(fileName)
 			for i, file in ipairs(fs.list(fileName)) do
 			    -- add files ending in .luo
 			    local extension = file:match( "%.(%w-)$" )
-			    if (extension and extension:lower() == "luo") or isDir(fileName) then
+			    if (extension and extension:lower() == "luo") or isDir(fileName .. "/" .. file) then
 			    	addFileName(fileName .. "/" .. file)
 			    end
 			end
@@ -90,7 +90,7 @@ local function addFileName(fileName)
 			for file in lfs.dir(fileName) do
 			    -- add files ending in .luo
 			    local extension = file:match( "%.(%w-)$" )
-			    if (extension and extension:lower() == "luo") or isDir(fileName) then
+			    if (extension and extension:lower() == "luo") or isDir(fileName .. "/" .. file) then
 			    	addFileName(fileName .. "/" .. file)
 			    end
 			end
@@ -1301,6 +1301,10 @@ end
 print("Parsed in " .. os.clock() - parseStartTime .. "s!")
 -- END PARSER
 
+local h = fs.open("parse.lua", "w")
+h.write(textutils.serialise(parsed))
+h.close()
+
 -- BEGIN COMPILER
 
 local compileStartTime = os.clock()
@@ -1367,7 +1371,7 @@ local function stopLineNumbering()
 end
 
 -- wrap the code to prevent global leaks
-add("setfenv(function()")
+-- add("setfenv(function()")
 
 -- first add all the built in functions
 local functionErrorID = addFunction(false,[[(m)error(m,3)end]])
@@ -1413,8 +1417,20 @@ local functionErrorIDs = {
 local functionExecuteID = addFunction(false,[[(f,e,...)return setfenv(f, e)(...)end]])
 
 -- TODO: minify when it 100% works
-local functionErrorProxyID = addFunction(false,[[(name, startLine, func)
-	return select(2, xpcall(func,  function(err)
+local functionErrorProxyID = addFunction(false,[[(name, startLine, str, env)
+	local func, err = loadstring(str)
+	if not func then
+		local line, message = err:match("^%%[.+%%]:(%%d+): (.+)$")
+		if not line then
+			line, message = err:match("^.+:%%d+: %%[.+%%]:(%%d+): (.+)$")
+		end
+		if line then
+			error(name .. ":" .. startLine + line - 1 .. ": " .. message, 0)
+		else
+			error(err, 0)
+		end
+	end
+	return select(2, xpcall(setfenv(func, env),  function(err)
 		local _, trace = pcall(error, "<@", 3)
 		local lineNumber = trace:match(":(%%d+): <@")
 		if not lineNumber then print(err)
@@ -2305,7 +2321,7 @@ for i, classDetails in pairs(classOrder) do
 				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", 
 				className, valueTableString, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
 			elseif mode == "static" then
-				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
+				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 			end
 		end
 	else
@@ -2318,7 +2334,7 @@ for i, blocks in ipairs(fileEnvironments) do
 	local id = fileEnvironmentIDs[i]
 	for startLine, content in pairs(blocks) do
 		if startLine ~= "fileName" then
-			add("%s(%q,%d,setfenv(loadstring([[%s]]), %s))", functionErrorProxyID, blocks.fileName, startLine, escapeSquare(content), id)
+			add("%s(%q,%d,[[%s]], %s)", functionErrorProxyID, blocks.fileName, startLine, escapeSquare(content), id)
 		end
 	end
 end
@@ -2356,7 +2372,7 @@ end
 local lineNumberString = "local %s={"
 didAdd = false
 for lineNumber, errorPrefix in pairs(lineNumberMap) do
-	lineNumberString = lineNumberString .. string.format("[%q]=%q,", lineNumber, errorPrefix)
+	lineNumberString = lineNumberString .. string.format("\n[%q]=%q,", lineNumber, errorPrefix)
 	didAdd = true
 end
 if didAdd then
@@ -2366,7 +2382,7 @@ if didAdd then
 	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
 	add([[function catchErrors(f,...)local a = {...}local r = {pcall(function()return f(unpack(a))end)}if not r[1] then local e = r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end]], filePathID, lineNumberID)
 end
-add("end, setmetatable({_G = _G, print=print}, __index=getfenv()))()")
+-- add("end,setmetatable({_G=_G,print=print},{__index=getfenv()}))()")
 
 print("Compiled in " .. os.clock() - compileStartTime .. "s!")
 

@@ -1,0 +1,33 @@
+local okay = [[
+local four = 2 + 2
+]]
+
+local bad = [[
+local four = 2 ++ 2
+]]
+
+local function loaderror(name, startLine, str)
+	local func, err = loadstring(str)
+	if not func then
+		local line, message = err:match("^%%[.+%%]:(%%d+): (.+)$")
+		if not line then
+			line, message = err:match("^.+:%%d+: %%[.+%%]:(%%d+): (.+)$")
+		end
+		if line then
+			error(name .. ":" .. startLine + line - 1 .. ": " .. message, 0)
+		else
+			error(err, 0)
+		end
+	end
+	return select(2, xpcall(func,  function(err)
+		local _, trace = pcall(error, "<@", 3)
+		local lineNumber = trace:match(":(%%d+): <@")
+		if not lineNumber then print(err)
+		else
+			print(name .. ":" .. lineNumber + startLine .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+		end
+	end))
+end
+
+loaderror("Okay", 1, okay)
+loaderror("Bad", 1, bad)

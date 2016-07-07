@@ -1,5 +1,6 @@
 loadfile("../luo")("output.lua", "Test.luo")
 dofile("output.lua")
+dofile("serialise")
 dofile("test")
 print("\n")
 -- enums
@@ -32,7 +33,6 @@ testFM("Instance Read-Only Write Catching", function()return pcall(function()bas
 testFM("Instance Read-Only Reading", function()return pcall(function()local v = basic.aReadOnly end)end, true)
 testFM("Instance Typeless Writing", function()return pcall(function()basic.aTypeless = "one" basic.aTypeless = 5 end)end, true)
 testFM("Instance Read-Only Write Catching", function()return pcall(function()basic.aTypelessReadOnly = "good bye" end)end, false, ".+:%d+: attempted to set read only property 'aTypelessReadOnly' of 'instance of 'Basic': 0x%x+' to 'good bye'")
-
 
 -- super class testing
 local child = Child("well", "hello", 42)
