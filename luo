@@ -580,14 +580,14 @@ for i, fileName in ipairs( inputPaths ) do
 				expression = expression .. lineNoComment .. "\n"
 			end
 		end
-		return expression
+		return expression, startLine
 	end
 
 	function demandFirstExpression( delimiters, description )
 		description = description or "An expression"
-		local expression = firstExpression( delimiters )
+		local expression, startLine = firstExpression( delimiters )
 		if expression and not expression:match( "^%s*$" ) then
-			return expression
+			return expression, startLine
 		else
 			parserError( description .. " was expected but wasn't found anywhere." )
 		end
@@ -863,16 +863,6 @@ for i, fileName in ipairs( inputPaths ) do
 		if blockLevel == BLOCK_LEVEL_NONE then
 			-- we're expecting a class definition
 			local didJump, keyword, jumpedString, startLine = jumpToKeywords( {[KEYWORD_CLASS] = true, [KEYWORD_INTERFACE] = true}, position, line )
-			if not jumpedString:match( "^(%s*)$" ) then
-				-- we only jumped more than just white space or nothing, it might be important
-				local existingLine = fileEnvironment[startLine]
-				if existingLine then
-					-- there might already be other code starting on this line (i.e. the class was on a single line), add to it rather than replacing
-					fileEnvironment[startLine] = existingLine .. " " .. jumpedString
-				else
-					fileEnvironment[startLine] = jumpedString
-				end
-			end
 			if didJump then
 				local className = immediateNextName( "class name" )
 				-- if there is a class name it is a declaration, otherwise just ignore it
@@ -900,6 +890,7 @@ for i, fileName in ipairs( inputPaths ) do
 							implements = {},
 							enums = {},
 							fileEnvironment = i,
+							fileName = fileName,
 							lineNumber = currentLine
 						}
 					elseif keyword == KEYWORD_INTERFACE then
@@ -925,12 +916,22 @@ for i, fileName in ipairs( inputPaths ) do
 					end
 					blockLevel = BLOCK_LEVEL_CLASS
 					isClassDefinition = true
+				else
+					jumpedString = jumpedString .. keyword
 				end
-			else
 				-- we're not in a class block, we can ignore this line
-				break
+				-- break
 			end
-
+			if not jumpedString:match( "^(%s*)$" ) then
+				-- we only jumped more than just white space or nothing, it might be important
+				local existingLine = fileEnvironment[startLine]
+				if existingLine then
+					-- there might already be other code starting on this line (i.e. the class was on a single line), add to it rather than replacing
+					fileEnvironment[startLine] = existingLine .. " " .. jumpedString
+				else
+					fileEnvironment[startLine] = jumpedString
+				end
+			end
 		elseif blockLevel == BLOCK_LEVEL_CLASS then
 			if isClassDefinition then
 				-- we're expecting either the extends, implements, etc, statement OR a property declaration
@@ -1011,16 +1012,17 @@ for i, fileName in ipairs( inputPaths ) do
 
 					-- try and get the default value out of it
 					local hasEquals = isNext( "^(%s*)=(%s*)", true )
-					local values
+					local values, startLine
 					if hasEquals then
-						values = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
+						values, startLine = demandFirstExpression( DEFAULT_DELIMITERS, "default value expression" )
 					else
 						parserError( "expected table of enum values" )
 					end
 
 					currentClass.enums[name] = {
 						type = propertyType,
-						values = values
+						values = values,
+						startLine = startLine
 					}
 				elseif keyword == KEYWORD_PROPERTY then
 					local nextKeyword = demandNextType( "property type" )
@@ -1315,9 +1317,14 @@ local function add(str, ...)
 	file = file .. string.format(str, ...)
 end
 
--- escape square brackets
 local function escapeSquare(str)
-	return str:gsub("%[(=*)%[", "[%1=["):gsub("%](=*)%]", "]%1=]")
+	local equalsCount = 0
+	local equals = ""
+	while --[[str:find("%[" .. equals .. "%[") or ]]str:find("%]" .. equals .. "%]") do
+		equalsCount = equalsCount + 1
+		equals = ("="):rep(equalsCount)
+	end
+	return equals
 end
 
 local idN = 1
@@ -1368,6 +1375,10 @@ local function stopLineNumbering()
 		lineNumberMap[lineNumberingOutputLine + i] = lineNumberingSourceFile .. ":" .. lineNumberingSourceLine + i .. ":"
 	end
 	lineNumberingOutputLine, lineNumberingSourceFile, lineNumberingSourceLine = nil, nil, nil
+end
+
+local function trim(str)
+	return str:match("^%s*(.-)%s*$")
 end
 
 -- wrap the code to prevent global leaks
@@ -1424,6 +1435,7 @@ local functionErrorProxyID = addFunction(false,[[(name, startLine, str, env)
 		if not line then
 			line, message = err:match("^.+:%%d+: %%[.+%%]:(%%d+): (.+)$")
 		end
+		print(err)
 		if line then
 			error(name .. ":" .. startLine + line - 1 .. ": " .. message, 0)
 		else
@@ -1880,7 +1892,8 @@ for i, classDetails in pairs(classOrder) do
 			for i, superDetails in ipairs(supersDetails) do
 				for variableName, content in pairs(superDetails[mode].instanceVariables) do
 					if not addedInstanceVariables[variableName] then
-						instanceVariablesString = instanceVariablesString .. string.format("[%q]=loadstring([[return %s]]),", variableName, escapeSquare(content))
+						local eq = escapeSquare(content)
+						instanceVariablesString = instanceVariablesString .. string.format("[%q]=loadstring([%s[return %s]%s]),", variableName, eq, content, eq)
 						didAdd = true
 						addedInstanceVariables[variableName] = true
 					end
@@ -2333,11 +2346,14 @@ end
 for i, blocks in ipairs(fileEnvironments) do
 	local id = fileEnvironmentIDs[i]
 	for startLine, content in pairs(blocks) do
-		if startLine ~= "fileName" then
-			add("%s(%q,%d,[[%s]], %s)", functionErrorProxyID, blocks.fileName, startLine, escapeSquare(content), id)
+		if startLine ~= "fileName" then -- TODO: what does this do???
+			local eq = escapeSquare(content)
+			add("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, id)
 		end
 	end
 end
+
+local enumTableCheckID
 
 -- load the enum values
 for i, classDetails in pairs(classOrder) do
@@ -2346,10 +2362,21 @@ for i, classDetails in pairs(classOrder) do
 		local enumIDs = classesEnumIDs[className]
 		local enumTypeOfTableIDs = classesEnumTypeOfTableIDs[className]
 		for enumName, content in pairs(classDetails.enums) do
+			if not enumTableCheckID then
+				enumTableCheckID = nextID()
+				add([[local function %s(t,n)if type(t)~="table"then error("Compiler Error: Value of enum "..n.." is not a table!",0)end return t end ]], enumTableCheckID)
+			end
 			-- create enum's value table
 			local enumTostringID = nextID()
 			local enumID = enumIDs[enumName]
-			add("%s=setfenv(loadstring([[return %s]]), %s)()", enumID, content.values, fileEnvironmentIDs[classDetails.fileEnvironment])
+
+			local eq = escapeSquare(content.values)
+			-- print(textutils.serialise(classDetails.enums))
+			-- add("%s(%q,%d,[%s[%s]%s], %s)", functionErrorProxyID, classDetails.fileName, startLine, eq, content, eq, id)
+			
+			add("%s=%s(%s(%q,%d,[%s[return %s]%s],%s),%q)", enumID, enumTableCheckID, functionErrorProxyID, classDetails.fileName, content.startLine, eq, trim(content.values), eq, fileEnvironmentIDs[classDetails.fileEnvironment], className .. "." .. enumName)
+
+			-- add("%s=%s(loadstring([[return %s]]),%s)()", enumID, functionErrorProxyID, content.values, fileEnvironmentIDs[classDetails.fileEnvironment])
 			add("local %s=\"enum '%s.%s': \" .. tostring(%s):sub(8)", enumTostringID, className, enumName, enumID)
 			add("setmetatable(%s,{__index=%s,__newindex=%s,__tostring=function()return %s end})", enumID, functionErrorIDs.metatable.enum.index, functionErrorIDs.metatable.enum.newindex, enumTostringID)
 
