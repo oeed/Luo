@@ -1435,21 +1435,26 @@ local functionErrorProxyID = addFunction(false,[[(name, startLine, str, env)
 		if not line then
 			line, message = err:match("^.+:%%d+: %%[.+%%]:(%%d+): (.+)$")
 		end
-		print(err)
 		if line then
 			error(name .. ":" .. startLine + line - 1 .. ": " .. message, 0)
 		else
 			error(err, 0)
 		end
 	end
-	return select(2, xpcall(setfenv(func, env),  function(err)
+	local okay, res = xpcall(setfenv(func, env), function(err)
 		local _, trace = pcall(error, "<@", 3)
-		local lineNumber = trace:match(":(%%d+): <@")
-		if not lineNumber then print(err)
+		local lineNumber = trace:match(":(%d+): <@")
+		if not lineNumber then
+			return err
 		else
-			print(name .. ":" .. lineNumber + startLine .. ": " .. err:match(":" .. lineNumber .. ": (.*)$"))
+			return name .. ":" .. lineNumber + startLine .. ": " .. err:match(":%d+: (.*)$")
 		end
-	end))
+	end)
+	if not okay then
+		error(res, 0)
+	else
+		return res
+	end
 end]])
 
 -- create tables for instances. every instance gets added to this table (but it is weak to prevent leaks). this is used for checking if a table is an instance
