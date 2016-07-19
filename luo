@@ -1442,16 +1442,16 @@ local functionErrorProxyID = addFunction(false,[[(name, startLine, str, env)
 		end
 	end
 	local okay, res = xpcall(setfenv(func, env), function(err)
-		local _, trace = pcall(error, "<@", 3)
-		local lineNumber = trace:match(":(%d+): <@")
+		local lineNumber, msg = err:match(":(%%d+): (.*)$")
 		if not lineNumber then
 			return err
 		else
-			return name .. ":" .. lineNumber + startLine .. ": " .. err:match(":%d+: (.*)$")
+			return name .. ":" .. lineNumber + startLine - 1 .. ": " .. msg
 		end
 	end)
 	if not okay then
-		error(res, 0)
+		print(res)
+		--error(res, 0)
 	else
 		return res
 	end
@@ -2347,17 +2347,6 @@ for i, classDetails in pairs(classOrder) do
 	end
 end
 
--- run the other code in the files inside their environments
-for i, blocks in ipairs(fileEnvironments) do
-	local id = fileEnvironmentIDs[i]
-	for startLine, content in pairs(blocks) do
-		if startLine ~= "fileName" then -- TODO: what does this do???
-			local eq = escapeSquare(content)
-			add("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, id)
-		end
-	end
-end
-
 local enumTableCheckID
 
 -- load the enum values
@@ -2412,8 +2401,20 @@ if didAdd then
 	add(lineNumberString:sub(1, #lineNumberString - 1) .. "}", lineNumberID)
 	local filePathID = nextID()
 	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
-	add([[function catchErrors(f,...)local a = {...}local r = {pcall(function()return f(unpack(a))end)}if not r[1] then local e = r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end]], filePathID, lineNumberID)
+	add([[function catchErrors(f,...)local a={...}local r={pcall(function()return f(unpack(a))end)}if not r[1] then local e=r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end ]], filePathID, lineNumberID)
 end
+
+-- run the other code in the files inside their environments
+for i, blocks in ipairs(fileEnvironments) do
+	local id = fileEnvironmentIDs[i]
+	for startLine, content in pairs(blocks) do
+		if startLine ~= "fileName" then -- TODO: what does this do???
+			local eq = escapeSquare(content)
+			add("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, id)
+		end
+	end
+end
+
 -- add("end,setmetatable({_G=_G,print=print},{__index=getfenv()}))()")
 
 print("Compiled in " .. os.clock() - compileStartTime .. "s!")
