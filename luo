@@ -1924,6 +1924,7 @@ for i, classDetails in pairs(classOrder) do
 
 				-- add the actual function code
 				local functionID = nextID()
+				local typeCheckLocals = {}
 				local typeChecking = ""
 				for i, argumentDetails in ipairs(functionDetails[4]) do
 					if argumentDetails.defaultValue then
@@ -1932,6 +1933,7 @@ for i, classDetails in pairs(classOrder) do
 					if not argumentDetails.isVarArg and argumentDetails.type then
 						local typeCheckFunction = typeCheck(argumentDetails.type, argumentDetails.allowsNil)
 						if typeCheckFunction then
+							table.insert(typeCheckLocals, typeCheckFunction)
 							typeChecking = typeChecking .. string.format("if %s(%s)then %s(self,%q,%q,%q,%s)end ", typeCheckFunction, argumentDetails.name, functionErrorIDs.type.parameter, argumentDetails.name, functionName, argumentDetails.type .. (argumentDetails.allowsNil and " (allowsNil)" or ""), argumentDetails.name)
 						end
 					end
@@ -1979,8 +1981,17 @@ for i, classDetails in pairs(classOrder) do
 						end
 					end
 				end
+				local typeCheckLocalsString = ""
+				if #typeCheckLocals > 0 then
+					local names = ""
+					for i, name in ipairs(typeCheckLocals) do
+						names = names .. "," .. name
+					end
+					typeCheckLocalsString = "local " .. names:sub(2) .. "=" .. names:sub(2) .. " "
+				end
+
 				startLineNumbering(classDetails.fileEnvironment, functionDetails[3])
-				add("function %s(self,super)return function%s%s%s end", functionID, functionDetails[1], typeChecking, functionBody)
+				add("function %s(self,super)%sreturn function%s%s%s end", functionID, typeCheckLocalsString, functionDetails[1], typeChecking, functionBody)
 				stopLineNumbering()
 				functionIDs[functionName] = functionID
 			end
@@ -2347,6 +2358,37 @@ for i, classDetails in pairs(classOrder) do
 	end
 end
 
+-- initialise the statics
+for i, initialiseString in ipairs(staticInitialiseStrings) do
+	add(unpack(initialiseString))
+end
+
+-- add the error map
+local lineNumberString = "local %s={"
+didAdd = false
+for lineNumber, errorPrefix in pairs(lineNumberMap) do
+	lineNumberString = lineNumberString .. string.format("\n[%q]=%q,", lineNumber, errorPrefix)
+	didAdd = true
+end
+if didAdd then
+	local lineNumberID = nextID()
+	add(lineNumberString:sub(1, #lineNumberString - 1) .. "}", lineNumberID)
+	local filePathID = nextID()
+	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
+	add([[function catchErrors(f,...)local a={...}local r={pcall(function()return f(unpack(a))end)}if not r[1] then local e=r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end ]], filePathID, lineNumberID)
+end
+
+-- run the other code in the files inside their environments
+for i, blocks in ipairs(fileEnvironments) do
+	local id = fileEnvironmentIDs[i]
+	for startLine, content in pairs(blocks) do
+		if startLine ~= "fileName" then -- TODO: what does this do???
+			local eq = escapeSquare(content)
+			add("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, id)
+		end
+	end
+end
+
 local enumTableCheckID
 
 -- load the enum values
@@ -2381,37 +2423,6 @@ for i, classDetails in pairs(classOrder) do
 		-- add the class' value table & metatable
 		-- add(unpack(valueTableStrings[className]))
 		add(unpack(metatableStrings[className]))
-	end
-end
-
--- initialise the statics
-for i, initialiseString in ipairs(staticInitialiseStrings) do
-	add(unpack(initialiseString))
-end
-
--- add the error map
-local lineNumberString = "local %s={"
-didAdd = false
-for lineNumber, errorPrefix in pairs(lineNumberMap) do
-	lineNumberString = lineNumberString .. string.format("\n[%q]=%q,", lineNumber, errorPrefix)
-	didAdd = true
-end
-if didAdd then
-	local lineNumberID = nextID()
-	add(lineNumberString:sub(1, #lineNumberString - 1) .. "}", lineNumberID)
-	local filePathID = nextID()
-	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
-	add([[function catchErrors(f,...)local a={...}local r={pcall(function()return f(unpack(a))end)}if not r[1] then local e=r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end ]], filePathID, lineNumberID)
-end
-
--- run the other code in the files inside their environments
-for i, blocks in ipairs(fileEnvironments) do
-	local id = fileEnvironmentIDs[i]
-	for startLine, content in pairs(blocks) do
-		if startLine ~= "fileName" then -- TODO: what does this do???
-			local eq = escapeSquare(content)
-			add("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, id)
-		end
 	end
 end
 
