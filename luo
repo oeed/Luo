@@ -1382,6 +1382,8 @@ local function trim(str)
 end
 
 -- wrap the code to prevent global leaks
+local environmentID = nextID()
+add("local " .. environmentID .. "=getfenv()")
 -- add("setfenv(function()")
 
 -- first add all the built in functions
@@ -1621,7 +1623,7 @@ local fileEnvironmentIDs = {}
 for i, blocks in ipairs(fileEnvironments) do
 	local id = nextID()
 	fileEnvironmentIDs[i] = id
-	add("%s=setmetatable({},{__index=_G})", id)
+	add("%s=setmetatable({},{__index=%s})", id, environmentID)
 end
 
 -- figure out the order that the classes need to be loaded (supers first)
@@ -2358,11 +2360,6 @@ for i, classDetails in pairs(classOrder) do
 	end
 end
 
--- initialise the statics
-for i, initialiseString in ipairs(staticInitialiseStrings) do
-	add(unpack(initialiseString))
-end
-
 -- add the error map
 local lineNumberString = "local %s={"
 didAdd = false
@@ -2424,6 +2421,11 @@ for i, classDetails in pairs(classOrder) do
 		-- add(unpack(valueTableStrings[className]))
 		add(unpack(metatableStrings[className]))
 	end
+end
+
+-- initialise the statics
+for i, initialiseString in ipairs(staticInitialiseStrings) do
+	add(unpack(initialiseString))
 end
 
 -- add("end,setmetatable({_G=_G,print=print},{__index=getfenv()}))()")
