@@ -1303,9 +1303,9 @@ end
 print("Parsed in " .. os.clock() - parseStartTime .. "s!")
 -- END PARSER
 
-local h = fs.open("parse.lua", "w")
-h.write(textutils.serialise(parsed))
-h.close()
+-- local h = fs.open("parse.lua", "w")
+-- h.write(textutils.serialise(parsed))
+-- h.close()
 
 -- BEGIN COMPILER
 
@@ -1618,14 +1618,6 @@ local function %s(instance, instanceType, instanceVariables, instanceFunctions, 
 	return instance
 end ]], localiseFunctionsID, functionErrorIDs.metatable.super.newindex, functionErrorIDs.metatable.super.newindex, instanceCreateID, staticInstancesID, instancesID, functionErrorIDs.type.default, localiseFunctionsID, localiseFunctionsID, localiseFunctionsID)
 
--- now add the file environments
-local fileEnvironmentIDs = {}
-for i, blocks in ipairs(fileEnvironments) do
-	local id = nextID()
-	fileEnvironmentIDs[i] = id
-	add("%s=setmetatable({},{__index=%s})", id, environmentID)
-end
-
 -- figure out the order that the classes need to be loaded (supers first)
 local classOrder = {}
 local orderedClasses = {}
@@ -1651,16 +1643,21 @@ end
 -- now create empty tables for all the classes and their statics (which are filled later on) so we can reference them directly when needed
 local classStaticIDs = {}
 local classTostringIDs = {}
-local classesString = "local %s={"
+local classesExistString = "local %s={"
 local didAdd = false
 for className, classDetails in pairs(parsed) do
 	-- TODO: maybe add an option which makes these locals?
 	didAdd = true
-	classesString = classesString .. string.format("[%s]=true,", className)
+	classesExistString = classesExistString .. string.format("[%s]=true,", className)
 	add("_G.%s={}", className)
 	local tostringID = nextID()
 	add("%s=\"" .. (classDetails.isInterface and "interface" or "class") .. " '%s': \"..tostring(%s):sub(8)", tostringID, className, className)
 	classTostringIDs[className] = tostringID
+
+
+
+
+
 	if not classDetails.isInterface then
 		local staticID = nextID()
 		classStaticIDs[className] = staticID
@@ -1668,10 +1665,10 @@ for className, classDetails in pairs(parsed) do
 	end
 end
 if didAdd then
-	classesString = classesString:sub(1, #classesString - 1)
+	classesExistString = classesExistString:sub(1, #classesExistString - 1)
 end
-local classesID = nextID()
-add(classesString .. "}", classesID)
+local classesExistID = nextID()
+add(classesExistString .. "}", classesExistID)
 
 local classesEnumIDs = {}
 local classesEnumTypeOfTableIDs = {}
@@ -1707,7 +1704,7 @@ local function typeCheck(typeName, allowsNil)
 	elseif standardTypes[typeName] then
 		id = addFunction(true,"(v)return %stype(v)~=\"%s\"end", allowsNilCheckOr, typeName:lower())
 	elseif typeName == "Class" then -- this means a CLASS, not an instance, not a static instance, a plain old class
-		id = addFunction(true,"(v)return %snot %s[v]end", allowsNilCheckOr, classesID)
+		id = addFunction(true,"(v)return %snot %s[v]end", allowsNilCheckOr, classesExistID)
 	elseif typeName == "Instance" then -- this means an INSTANCE, not a static instance or a class
 		id = addFunction(true,"(v)return %snot %s[v]end", allowsNilCheckOr, instancesID)
 	elseif typeName == "Static" then -- this means a STATIC instance, not a normal instance or a class
@@ -1819,10 +1816,17 @@ end
 local metatableStrings = {}
 local valueTableStrings = {}
 local staticInitialiseStrings = {}
+local classesString = "local %s={"
+local classesID = nextID()
 for i, classDetails in pairs(classOrder) do
 	local className = classDetails.className
 	-- print("Compiling: " .. className)
+	classesString = classesString .. string.format("[%q]=function()%s[%q]=nil ", className, classesID, className)
 	if not classDetails.isInterface then
+		-- now add the file environment
+		fileEnvironmentID = nextID()
+		add("%s=setmetatable({},{__index=%s})", fileEnvironmentID, environmentID)
+
 		local interfaces = {}
 		for i, interfaceName in ipairs(classDetails.implements) do
 			table.insert(interfaces, parsed[interfaceName])
@@ -1880,16 +1884,16 @@ for i, classDetails in pairs(classOrder) do
 					end
 				end
 			end
-			add("%s={", defaultValuesID)
+			classesString = classesString .. string.format("%s={", defaultValuesID)
 			for propertyName, defaultValue in pairs(flattenedDefaultValues) do
-				add("[%q]=loadstring(%q),", propertyName, "return " .. defaultValue)
+				classesString = classesString .. string.format("[%q]=loadstring(%q),", propertyName, "return " .. defaultValue)
 			end
-			add("}")
+			classesString = classesString .. string.format("}")
 			local defaultValuesTypesString = "%s={"
 			for propertyName, typeDetails in pairs(flattenedDefaultValuesTypes) do
 				defaultValuesTypesString = defaultValuesTypesString .. string.format("[%q]={%s,%q},", propertyName, typeCheck(typeDetails[1], typeDetails[2]), typeDetails[1] .. (typeDetails[2] and " (allowsNil)" or ""))
 			end
-			add(defaultValuesTypesString .. "}", defaultValuesTypesID)
+			classesString = classesString .. string.format(defaultValuesTypesString .. "}", defaultValuesTypesID)
 
 			-- add the instance variables
 			local instanceVariablesID
@@ -1908,7 +1912,7 @@ for i, classDetails in pairs(classOrder) do
 			end
 			if didAdd then
 				instanceVariablesID = nextID()
-				add(instanceVariablesString:sub(1,#instanceVariablesString - 1) .. "}", instanceVariablesID)
+				classesString = classesString .. string.format(instanceVariablesString:sub(1,#instanceVariablesString - 1) .. "}", instanceVariablesID)
 			end
 
 			-- add the functions
@@ -2350,14 +2354,23 @@ for i, classDetails in pairs(classOrder) do
 			-- add the class metatable
 			if mode == "instance" then
 				metatableStrings[className] = {"setmetatable(%s,{__index=%s,__newindex=%s,__call=function(_,...)return %s({},%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s,...)end,__tostring=function()return %s end})", 
-				className, valueTableString, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
+				className, valueTableString, functionErrorIDs.metatable.class.newindex, instanceCreateID, mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentID, className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID, classTostringIDs[className]}
 			elseif mode == "static" then
-				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentIDs[classDetails.fileEnvironment], className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
+				insert(staticInitialiseStrings, {"%s(%s,%q,%s,%s,%s,%s,%s,%s,%q,%s,%s,%s,%s,%s)",instanceCreateID, classStaticIDs[className], mode, instanceVariablesID, functionsTableID, eventsTableID, defaultValuesID, defaultValuesTypesID, fileEnvironmentID, className, instanceIndexTableID, instanceNewindexTableID, superNamesID, propertyMethodsTableID, typeOfTreeID})
 			end
+		end
+
+		-- run the other code in the inside the environments
+		for startLine, content in pairs(fileEnvironments[classDetails.fileEnvironment]) do
+			-- if startLine ~= "fileName" then -- TODO: what does this do???
+				local eq = escapeSquare(content)
+				classesString = classesString .. string.format("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, fileEnvironmentID)
+			-- end
 		end
 	else
 		add("setmetatable(%s,{__index=%s,__newindex=%s,__tostring=function()return %s end})", className, functionErrorIDs.metatable.interface.index, functionErrorIDs.metatable.interface.newindex, classTostringIDs[className])
 	end
+	classesString = classesString .. "end,"
 end
 
 -- add the error map
@@ -2373,17 +2386,6 @@ if didAdd then
 	local filePathID = nextID()
 	add("local _,__t=pcall(error,\"<@\",2)local %s=__t:match(\"^(.+):%%d+: <@\")", filePathID)
 	add([[function catchErrors(f,...)local a={...}local r={pcall(function()return f(unpack(a))end)}if not r[1] then local e=r[2] local n,m=e:match("^"..%s .. ":(%%d+): (.+)$")if n then local p=%s[n]if p then error(p..m,0)end end error(e,0)else table.remove(r,1)return unpack(r)end end ]], filePathID, lineNumberID)
-end
-
--- run the other code in the files inside their environments
-for i, blocks in ipairs(fileEnvironments) do
-	local id = fileEnvironmentIDs[i]
-	for startLine, content in pairs(blocks) do
-		if startLine ~= "fileName" then -- TODO: what does this do???
-			local eq = escapeSquare(content)
-			add("%s(%q,%d,[%s[%s]%s],%s)", functionErrorProxyID, blocks.fileName, startLine, eq, trim(content), eq, id)
-		end
-	end
 end
 
 local enumTableCheckID
