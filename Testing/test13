@@ -1,9 +1,0 @@
-local function trim(str)
-	return str:match("^%s*(.-)%s*$")
-end
-
-
-print("'"..trim([[   hi there    
-
-
-	]]).."'")
