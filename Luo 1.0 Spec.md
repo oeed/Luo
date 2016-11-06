@@ -23,7 +23,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 **ANY** - any possible valid value, including nil or 'nothing' values
 
-**valid name** - any valid Lua variable name (excluding those only accessible by table lookup)
+**VALID NAME** - any valid Lua variable name (excluding those only accessible by table lookup)
 
 ##Language Summary
 
@@ -42,7 +42,7 @@ Luo aims to retain syntax that feels like Lua, while still using familiar struct
 
 - MAY extend at most one other class (excluding itself or a subclass).
 - MAY have ANY NUMBER of protocols.
-- MUST have a unique, valid name. Any invalid names MUST error at compile time.
+- MUST have a unique, valid name. MUST not have the same name as ANY Standard Type. Any invalid names MUST error at compile time.
 - MUST NOT contain any classes within itself, even within code blocks.
 - MAY have ANY NUMBER of properties.
 
@@ -52,10 +52,9 @@ Luo aims to retain syntax that feels like Lua, while still using familiar struct
 
 - MUST have a unique, valid name.
 - MUST be either a static or instance member
-- MAY have a single Type.
-- MAY have a single Interface Link.
+- MAY have a single Property Type.
 - MAY have a valid Default Value which SHOULD be checked for validity at compile time when possible.
-- MAY have one each of `get`, `set`, `willSet` `didSet` Property Methods.
+- MAY have one each of `get`, `set`, `willSet`, `didSet` Property Methods.
 
 ##Functions
 
@@ -69,3 +68,90 @@ Luo aims to retain syntax that feels like Lua, while still using familiar struct
 - All parameter values MUST be supplied, unless the Parameter Type allows nil.
 - All supplied parameter values MUST be Type Checked and valid.
 - MUST have one code block which MUST contain valid Luo code. ANY non-runtime errors such as type and syntax MUST error at compile time.
+
+##Types
+
+###Type Structures
+
+####Basic Type
+
+The basic building block of Types. For example, a String, Table (with any contents), Instance of a Class, etc.
+
+- MUST only check the value of the property itself and not anything within the value (such as properties, keys, etc).
+- MUST NOT be `nil` (see Nillable Types)
+- MUST be a VALID NAME.
+- MUST be one of the following.
+	- A Standard Type.
+	- A defined Class.
+
+####Array Type
+
+- MUST have one specified Basic Type
+- MUST be a table
+- MAY be empty
+- MUST NOT be `nil` (see Nillable Types)
+- MUST only contain values that are of the specified Basic Type
+- MUST error when inserting an invalid values at compile time if within Luo code or at runtime within Lua code
+
+> It might be necessary to type check these when passed as parameters (if someone modifies the metatable), but it is obviously advantageous not to for performance reasons
+
+####Dictionary Type
+
+- MUST have two specified Basic Type (one for the key, one for the value)
+- MUST be a table
+- MAY be empty
+- MUST NOT be `nil` (see Nillable Types)
+- MUST only contain keys and values that are of the respective specified key and value Basic Types
+
+> It might be necessary to type check these when passed as parameters (if someone modifies the metatable), but it is obviously advantageous not to for performance reasons
+
+###Standard Types
+
+These are the standard types from Lua. Their names are simply the built-in type names with the first letter capitalised.
+
+- MUST be a Basic Type
+- the return value of `type()` MUST equal the corresponding Type String below when given the value
+
+| Name | Type String |
+| :--: | :---------: |
+| String   | string   |
+| Number   | number   |
+| Boolean  | boolean  |
+| Table    | table    |
+| Function | function |
+| Thread   | thread   |
+| Userdata | userdata |
+
+###Nillable Types
+
+- MAY be of any Type Structure
+- MAY have the value `nil`
+
+###Linked Type
+
+This is mainly for linking things like buttons
+
+- MUST only be a Basic Type
+- If a Nillable Type: MUST link to desired value, if it exists
+- If not a Nillable Type: MUST link to desired value, error if it doesn't exist
+- linked value MUST be of the
+
+###Property Type
+
+- MUST be ANY one of the Type Structures.
+- MAY be a Nillable Type
+- MAY be a Linked Type
+
+###Parameter Type
+
+- MUST be ANY one of the Type Structures
+- MAY be a Nillable Type
+- MAY NOT be a Linked Type
+- MUST error at compile time and run time if invalid
+
+###Return Type
+
+- MUST be ANY one of the Type Structures
+- MAY be a Nillable Type
+- MAY NOT be a Linked Type
+- MUST error at compile time and run time if invalid
