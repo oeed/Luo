@@ -42,7 +42,7 @@ Luo aims to retain syntax that feels like Lua, while still using familiar struct
 
 - MAY extend at most one other class (excluding itself or a subclass).
 - MAY have ANY NUMBER of protocols.
-- MUST have a unique, valid name. MUST not have the same name as ANY [[Standard Type]]. Any invalid names MUST error at compile time.
+- MUST have a unique, valid name. MUST not have the same name as ANY built-in [[Types]]. Any invalid names MUST error at compile time.
 - MUST NOT contain any classes within itself, even within code blocks.
 - MAY have ANY NUMBER of properties.
 
