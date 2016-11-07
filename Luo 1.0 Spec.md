@@ -52,7 +52,7 @@ Luo aims to retain syntax that feels like Lua, while still using familiar struct
 
 - MUST have a unique, valid name.
 - MUST be either a static or instance member
-- MAY have a single [[Property Type]].
+- MAY have a single [[Property Type|Property Types]].
 - MAY have a valid Default Value which SHOULD be checked for validity at compile time when possible.
 - MAY have one each of `get`, `set`, `willSet`, `didSet` Property Methods.
 
@@ -62,57 +62,57 @@ Luo aims to retain syntax that feels like Lua, while still using familiar struct
 
 - MUST have a unique, valid name.
 - MUST be either a static or instance member
-- MAY specify ANY NUMBER of [[Return Type]]s, all of which which MUST be returned.
-- If zero [[Return Type]]s are specified then the function MUST allow ANY NUMBER of values to be returned of ANY [[Return Type]].
-- MAY specify ANY NUMBER of [[Parameter Type]]s.
-- All parameter values MUST be supplied, unless the [[Parameter Type]] allows nil.
+- MAY specify ANY NUMBER of [[Return Types]], all of which which MUST be returned.
+- If zero [[Return Types]] are specified then the function MUST allow ANY NUMBER of values to be returned of ANY [[Return Type|Return Types]].
+- MAY specify ANY NUMBER of [[Parameter Types]].
+- All parameter values MUST be supplied, unless the [[Parameter Type|Parameter Types]] allows nil.
 - All supplied parameter values MUST be Type Checked and valid.
 - MUST have one code block which MUST contain valid Luo code. ANY non-runtime errors such as type and syntax MUST error at compile time.
 
 ##Types
 
-###[[Type Structures]]
+###Type Structures
 
-####[[Basic Type]]
+####Basic Types
 
-The basic building block of Types. For example, a String, Table (with any contents), Instance of a Class, etc.
+The basic building block of Types. For example, a [[String|Standard Types]], [[Table|Standard Types]] (with ANY contents), [[Instance of a Class|Instance Types]], etc.
 
 - MUST only check the value of the property itself and not anything within the value (such as properties, keys, etc).
 - MUST NOT be `nil` (see [[Nillable Types]])
 - MUST be a VALID NAME.
 - MUST be one of the following.
-	- A [[Standard Type]].
-	- A [[Instance Type]].
-	- A Static Type.
-	- The Class Type.
+	- A [[Standard Type|Standard Types]].
+	- A [[Instance Type|Instance Types]].
+	- A [[Static Type|Static Types]].
+	- The [[Class Type]].
 	- The [[Any Type]].
 
-####Array Type
+####Array Types
 
-- MUST have one specified [[Basic Type]]
+- MUST have one specified [[Basic Type|Basic Types]]
 - MUST be a table
 - MAY be empty
 - MUST NOT be `nil` (see [[Nillable Types]])
-- MUST only contain values that are of the specified [[Basic Type]]
+- MUST only contain values that are of the specified [[Basic Type|Basic Types]]
 - MUST error when inserting an invalid values at compile time if within Luo code or at runtime within Lua code
 
 > It might be necessary to type check these when passed as parameters (if someone modifies the metatable), but it is obviously advantageous not to for performance reasons
 
-####Dictionary Type
+####Dictionary Types
 
-- MUST have two specified [[Basic Type]] (one for the key, one for the value)
+- MUST have two specified [[Basic Type|Basic Types]] (one for the key, one for the value)
 - MUST be a table
 - MAY be empty
 - MUST NOT be `nil` (see [[Nillable Types]])
-- MUST only contain keys and values that are of the respective specified key and value [[Basic Type]]s
+- MUST only contain keys and values that are of the respective specified key and value [[Basic Types]]
 
 > It might be necessary to type check these when passed as parameters (if someone modifies the metatable), but it is obviously advantageous not to for performance reasons
 
 ###Standard Types
 
-These are the standard types from Lua. Their names are simply the built-in type names with the first letter capitalised.
+These are the standard types from Lua.
 
-- MUST be a [[Basic Type]]
+- MUST be a [[Basic Type|Basic Types]]
 - the return value of `type()` MUST equal the corresponding Type String below when given the value
 
 | Name | Type String |
@@ -123,56 +123,74 @@ These are the standard types from Lua. Their names are simply the built-in type 
 | Table    | table    |
 | Function | function |
 | Thread   | thread   |
-| Userdata | userdata |
+| UserData | userdata |
 
-###[[Instance Type]]
+###Instance Types
 
-This Type represents an Instance of a Class.
+This Type represents an [[Instance]] of a [[Class]].
 
-###[[Any Type]]
+- MUST be a [[Basic Type|Basic Types]]
+- value MUST be an [[Instance]] of the specified [[Class]], or an [[Instance]] of a [[Subclass]] of the specified [[Class]]
+
+###Static Types
+
+This Type represents the [[Static]] of a [[Class]].
+
+- MUST be a [[Basic Type|Basic Types]]
+- value MUST be the [[Static]] of the specified [[Class]], or the [[Static]] of a [[Subclass]] of the specified [[Class]]
+
+###Class Type
+
+This Type represents the [[Static]] of a [[Class]].
+
+- MUST be a [[Class]].
+- MUST NOT be an [[Instance]] or [[Static]].
+
+###Any Type
 
 The [[Any Type]] allows any value, other than `nil`.
 
+- MUST be a [[Basic Type|Basic Types]]
 - MUST NOT have the value `nil`
 
-####[[Nillable Any Type]]
+####Nillable Any Type
 
 This allows absolutely ANY value and hence does not need to be Type Checked at all.
 
 - MUST accept any value, including `nil`
 
-###[[Nillable Types]]
+###Nillable Types
 
 - MAY be of any [[Type Structure]]
 - MAY have the value `nil`
 
-###[[Linked Type]]
+###Linked Type
 
 This is mainly for linking things like buttons
 
-- MUST only be a [[Basic Type]]
+- MUST only be a [[Basic Type|Basic Types]]
 - If a [[Nillable Type]]: MUST link to desired value, if it exists
 - If not a [[Nillable Type]]: MUST link to desired value, error if it doesn't exist
-- linked value MUST be of the
+- linked value MUST be an [[Instance]] of the specified [[Class]], or an instance of a [[Subclass]] of the specified [[Class]]
 
-###[[Property Type]]
+###Property Types
 
 - MUST be ANY one of the [[Type Structures]].
 - MAY be a [[Nillable Type]]
-- MAY be a [[Linked Type]]
+- MAY be a [[Linked Type|Linked Types]]
 
-###[[Parameter Type]]
+###Parameter Types
 
 - MUST be ANY one of the [[Type Structures]]
 - MAY be a [[Nillable Type]]
-- MAY NOT be a [[Linked Type]]
+- MAY NOT be a [[Linked Type|Linked Types]]
 - MUST error at compile time and run time if invalid
 
-###[[Return Type]]
+###Return Types
 
 - MUST be ANY one of the [[Type Structures]]
 - MAY be a [[Nillable Type]]
-- MAY NOT be a [[Linked Type]]
+- MAY NOT be a [[Linked Type|Linked Types]]
 - MUST error at compile time and run time if invalid
 
 ###Unspecified Type
