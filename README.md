@@ -18,6 +18,9 @@ class Person
 	property String lastName
 	property Language.static language = EnglishLanguage.static
 
+	property Boolean isMale
+	property isMale: Boolean?!
+
 	function initialise(String firstName = "John", String lastName = "Smith", Boolean isMale = true)
 		self.firstName = firstName
 		self.lastName = lastName
