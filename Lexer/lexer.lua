@@ -227,4 +227,10 @@ function lex(code)
 	return tokens
 end
 
-return {lex = lex}
+return {
+	tokenTypes = tokenTypes,
+	tokenKeys = tokenKeys,
+	operators = operators,
+	keywords = keywords,
+	lex = lex
+}
