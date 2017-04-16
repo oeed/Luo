@@ -1,8 +1,11 @@
-local IDENTIFIER = 0
-local KEYWORD = 1
-local STRING = 2
-local NUMBER = 3
-local OPERATOR = 4
+local stringFind = string.find
+local stringSub = string.sub
+
+local IDENTIFIER = 1
+local KEYWORD = 2
+local STRING = 3
+local NUMBER = 4
+local OPERATOR = 5
 
 tokenTypes = {
 	IDENTIFIER = IDENTIFIER,
@@ -16,16 +19,39 @@ tokenKeys = {
 	TYPE = 1,
 	VALUE = 2,
 	LINE_NUMBER = 3,
-	START_INDEX = 4,
-	END_INDEX = 5,
-	ORIGINAL_VALUE = 6
+	COLUMN_NUMBER = 4,
+	START_INDEX = 5,
+	END_INDEX = 6,
+	ORIGINAL_VALUE = 7
 }
 
 operators = {
 	TYPE_SET = 1,
-	TYPE_SET = 1,
-	EQUAL = 2,
-	EQUAS = 2,
+	OPTIONAL = 2,
+	DOUBLE_EQUAL = 3,
+	NOT_EQUAL = 4,
+	LESS_THAN_EQUAL = 5,
+	GREATER_THAN_EQUAL = 6,
+	VAR_ARG = 7,
+	CONCATENATE = 8,
+	EQUAL = 9,
+	PLUS = 10,
+	MULTIPLY = 11,
+	MINUS = 12,
+	HASH = 13,
+	DIVIDE = 14,
+	MODULUS = 15,
+	EXPONENT = 16,
+	GREATHER_THAN = 17,
+	LESS_THAN = 18,
+	DOT = 19,
+	SQUARE_BRACKET_LEFT = 20,
+	SQUARE_BRACKET_RIGHT = 21,
+	ROUND_BRACKET_LEFT = 22,
+	ROUND_BRACKET_RIGHT = 23,
+	CURLY_BRACKET_LEFT = 24,
+	CURLY_BRACKET_RIGHT = 25,
+	COMMA = 26
 }
 
 keywords = {
@@ -93,16 +119,16 @@ local function filterIdentifier(str)
 end
 
 local tokenMatches = {
-	{'^%s+', nil, nil} -- whitespace
+	{'^%s+', nil, nil}, -- whitespace
 	{'^0x[%da-fA-F]+', NUMBER, tonumber}, -- hex numbers
 	{'^[%a_][%w_]*', IDENTIFIER, filterIdentifier}, -- identifiers
 	{'^%d+%.?%d*[eE][%+%-]?%d+', NUMBER, tonumber}, -- scientific numbers
 	{'^%d+%.?%d*', NUMBER, tonumber}, -- decimal numbers
-	{"^(['\"])%1", STRING, ""} -- empty string
+	{"^(['\"])%1", STRING, ""}, -- empty string
 	{[[^(['"])(\*)%2%1]], STRING, filterString}, -- string
 	{[[^(['"]).-[^\](\*)%2%1]], STRING, filterString}, -- string with escapes
-	{'^%-%-.-\n', nil, nil}, -- single line comment
 	{'^%-%-%[(=*)%[.-%]%1%]', nil, nil}, -- multi-line comment
+	{'^%-%-.-\n', nil, nil}, -- single line comment
 	{'^%[(=*)%[.-%]%1%]', STRING, filterLongString}, -- multi-line string
 	{'^:', OPERATOR, operators.TYPE_SET},
 	{'^?', OPERATOR, operators.OPTIONAL},
@@ -122,49 +148,66 @@ local tokenMatches = {
 	{'^%^', OPERATOR, operators.EXPONENT},
 	{'^>', OPERATOR, operators.GREATHER_THAN},
 	{'^<', OPERATOR, operators.LESS_THAN},
+	{'^%.', OPERATOR, operators.DOT},
+	{'^%[', OPERATOR, operators.SQUARE_BRACKET_LEFT},
+	{'^%]', OPERATOR, operators.SQUARE_BRACKET_RIGHT},
+	{'^%(', OPERATOR, operators.ROUND_BRACKET_LEFT},
+	{'^%)', OPERATOR, operators.ROUND_BRACKET_RIGHT},
+	{'^{', OPERATOR, operators.CURLY_BRACKET_LEFT},
+	{'^}', OPERATOR, operators.CURLY_BRACKET_RIGHT},
+	{'^,', OPERATOR, operators.COMMA},
 }
-
-local stringFind = string.find
-local stringSub = string.sub
 
 function lex(code)
 	local nextIndex = 1
 	tokens = {}
--- TODO: we're going to need to change to itterating over a single string so we can match multiline comments
-	for lineNo, line in ipairs(lines) do
-		local charIndex = 1
-		local lineLength = #line
-		while charIndex <= lineLength do
-			local matched = false
-			for i, tokenMatch in ipairs(tokenMatches) do
-				local startIndex, endIndex, findMatch = stringFind(line, tokenMatch[1])
-				if startIndex then
-					local tokenType = tokenMatch[2]
-					if not tokenType then -- we ignore tokens without a type (whitespace, comments, etc.)
-						local filterFunction = tokenMatch[3]
-						
-						local value = stringSub(line, startIndex, endIndex)
-						local filteredValue = type(filterFunction) == "function" and filterFunction(value, findMatch) or filterFunction
-						tokens[nextIndex] = {
-							tokenType, -- TYPE
-							filteredValue, -- VALUE
-							startIndex, -- START_INDEX
-							endIndex, -- END_INDEX
-							value -- ORIGINAL_VALUE	
-						}
-						nextIndex = nextIndex + 1
-					end
 
-					charIndex = endIndex + 1
-					matched = true
-					break -- we've done one token, so start looping over the tokens again for this line
+	local charIndex = 1
+	local codeLength = #code
+	local lineIndex = 1
+	local lineStartIndex = 1
+	while charIndex <= codeLength do
+		local matched = false
+		for i, tokenMatch in ipairs(tokenMatches) do
+			local startIndex, endIndex, findMatch = stringFind(code, tokenMatch[1], charIndex)
+			if startIndex then
+				local tokenType = tokenMatch[2]
+				local value = stringSub(code, startIndex, endIndex)
+				if tokenType then -- we ignore tokens without a type (whitespace, comments, etc.)
+					local filterFunction = tokenMatch[3]
+					
+					local filteredValue, replacementType = type(filterFunction) == "function" and filterFunction(value, findMatch) or filterFunction
+					tokens[nextIndex] = {
+						replacementType or tokenType, -- TYPE
+						filteredValue, -- VALUE
+						lineIndex, -- LINE_NUMBER
+						startIndex - lineStartIndex + 1, -- COLUMN_INDEX
+						startIndex, -- START_INDEX
+						endIndex, -- END_INDEX
+						value -- ORIGINAL_VALUE	
+					}
+					nextIndex = nextIndex + 1
 				end
-				if not matched then
-					error("Could not find match!")
-				end
+
+                if value:find("\n") then
+                    -- Update line number.
+                    local _, newLineCount = value:gsub("\n", "")
+                    lineIndex = lineIndex + newLineCount
+                    local prefixStart, prefixEnd, m = value:find("\n[^\n]+$")
+					lineStartIndex = endIndex - (prefixStart and (prefixEnd - prefixStart - 1) or -1)
+                end
+
+				charIndex = endIndex + 1
+				matched = true
+				break -- we've done one token, so start looping over the tokens again for this line
 			end
 		end
+		if not matched then
+			print("Line: " .. lineIndex)
+			error("Could not find match at: " .. stringSub(code, charIndex, charIndex + 10))
+		end
 	end
-
 	return tokens
 end
+
+return {lex = lex}

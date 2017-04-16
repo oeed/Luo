@@ -5,6 +5,7 @@ class Person: Object
 	property firstName: String
 	property lastName: String
 	property language: Language.Type = EnglishLanguage.self -- .Type means that rather than being an instance, the vaule has to be the class/static itself (or a subclass' class/static)
+	property table: Table = {}
 
 	default otherThing = "One" -- overwrite the default value defined in a superclass
 
