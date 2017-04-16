@@ -85,7 +85,8 @@ keywords = {
 	WHILE = 20,
 	CLASS = 21,
 	PROPERTY = 22,
-	IS = 23
+	IS = 23,
+	ENUM = 24,
 }
 
 local lookupKeywords = {
@@ -96,7 +97,7 @@ local lookupKeywords = {
     ["not"] = keywords.NOT, ["or"] = keywords.OR, ["repeat"] = keywords.REPEAT,
     ["return"] = keywords.RETURN, ["then"] = keywords.THEN, ["true"] = keywords.TRUE,
     ["until"] = keywords.UNTIL,  ["while"] = keywords.WHILE, ["class"] = keywords.CLASS, ["property"] = keywords.PROPERTY,
-    ["is"] = keywords.IS
+    ["is"] = keywords.IS, ["enum"] = keywords.ENUM
 }
 
 -- Filter functions. Gets the actual value we want from the string
