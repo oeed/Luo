@@ -34,24 +34,32 @@ operators = {
 	GREATER_THAN_EQUAL = 6,
 	VAR_ARG = 7,
 	CONCATENATE = 8,
-	EQUAL = 9,
-	PLUS = 10,
-	MULTIPLY = 11,
-	MINUS = 12,
-	HASH = 13,
-	DIVIDE = 14,
-	MODULUS = 15,
-	EXPONENT = 16,
-	GREATHER_THAN = 17,
-	LESS_THAN = 18,
-	DOT = 19,
-	SQUARE_BRACKET_LEFT = 20,
-	SQUARE_BRACKET_RIGHT = 21,
-	ROUND_BRACKET_LEFT = 22,
-	ROUND_BRACKET_RIGHT = 23,
-	CURLY_BRACKET_LEFT = 24,
-	CURLY_BRACKET_RIGHT = 25,
-	COMMA = 26
+	PLUS_PLUS = 9,
+	MINUS_MINUS = 10,
+	PLUS_EQUAL = 11,
+	MINUS_EQUAL = 12,
+	MULTIPLY_EQUAL = 13,
+	DIVIDE_EQUAL = 14,
+	MODULUS_EQUAL = 15,
+	EXPONENT_EQUAL = 16,
+	EQUAL = 17,
+	PLUS = 18,
+	MULTIPLY = 19,
+	MINUS = 20,
+	HASH = 21,
+	DIVIDE = 22,
+	MODULUS = 23,
+	EXPONENT = 24,
+	GREATHER_THAN = 25,
+	LESS_THAN = 26,
+	DOT = 27,
+	SQUARE_BRACKET_LEFT = 28,
+	SQUARE_BRACKET_RIGHT = 29,
+	ROUND_BRACKET_LEFT = 30,
+	ROUND_BRACKET_RIGHT = 31,
+	CURLY_BRACKET_LEFT = 32,
+	CURLY_BRACKET_RIGHT = 33,
+	COMMA = 34
 }
 
 keywords = {
@@ -138,10 +146,18 @@ local tokenMatches = {
 	{'^>=', OPERATOR, operators.GREATER_THAN_EQUAL},
 	{'^%.%.%.', OPERATOR, operators.VAR_ARG},
 	{'^%.%.', OPERATOR, operators.CONCATENATE},
+	{'^++', OPERATOR, operators.PLUS_PLUS},
+	{'^%-%-', OPERATOR, operators.MINUS_MINUS},
+	{'^+=', OPERATOR, operators.PLUS_EQUAL},
+	{'^%-=', OPERATOR, operators.MINUS_EQUAL},
+	{'^*=', OPERATOR, operators.MULTIPLY_EQUAL},
+	{'^/=', OPERATOR, operators.DIVIDE_EQUAL},
+	{'^%%=', OPERATOR, operators.MODULUS_EQUAL},
+	{'^%^=', OPERATOR, operators.EXPONENT_EQUAL},
 	{'^=', OPERATOR, operators.EQUAL},
 	{'^+', OPERATOR, operators.PLUS},
 	{'^*', OPERATOR, operators.MULTIPLY},
-	{'^-', OPERATOR, operators.MINUS},
+	{'^%-', OPERATOR, operators.MINUS},
 	{'^#', OPERATOR, operators.HASH},
 	{'^/', OPERATOR, operators.DIVIDE},
 	{'^%%', OPERATOR, operators.MODULUS},
@@ -157,6 +173,8 @@ local tokenMatches = {
 	{'^}', OPERATOR, operators.CURLY_BRACKET_RIGHT},
 	{'^,', OPERATOR, operators.COMMA},
 }
+
+local m = 0
 
 function lex(code)
 	local nextIndex = 1
@@ -196,15 +214,13 @@ function lex(code)
                     local prefixStart, prefixEnd, m = value:find("\n[^\n]+$")
 					lineStartIndex = endIndex - (prefixStart and (prefixEnd - prefixStart - 1) or -1)
                 end
-
 				charIndex = endIndex + 1
 				matched = true
 				break -- we've done one token, so start looping over the tokens again for this line
 			end
 		end
 		if not matched then
-			print("Line: " .. lineIndex)
-			error("Could not find match at: " .. stringSub(code, charIndex, charIndex + 10))
+			error("Lexer error: invalid token at: " .. stringSub(code, charIndex, charIndex + 10))
 		end
 	end
 	return tokens
