@@ -128,51 +128,51 @@ local function filterIdentifier(str)
 end
 
 local tokenMatches = {
-	{'^%s+', nil, nil}, -- whitespace
-	{'^0x[%da-fA-F]+', NUMBER, tonumber}, -- hex numbers
-	{'^[%a_][%w_]*', IDENTIFIER, filterIdentifier}, -- identifiers
-	{'^%d+%.?%d*[eE][%+%-]?%d+', NUMBER, tonumber}, -- scientific numbers
-	{'^%d+%.?%d*', NUMBER, tonumber}, -- decimal numbers
-	{"^(['\"])%1", STRING, ""}, -- empty string
-	{[[^(['"])(\*)%2%1]], STRING, filterString}, -- string
-	{[[^(['"]).-[^\](\*)%2%1]], STRING, filterString}, -- string with escapes
-	{'^%-%-%[(=*)%[.-%]%1%]', nil, nil}, -- multi-line comment
-	{'^%-%-.-\n', nil, nil}, -- single line comment
-	{'^%[(=*)%[.-%]%1%]', STRING, filterLongString}, -- multi-line string
-	{'^:', OPERATOR, operators.TYPE_SET},
-	{'^?', OPERATOR, operators.OPTIONAL},
-	{'^==', OPERATOR, operators.DOUBLE_EQUAL},
-	{'^~=', OPERATOR, operators.NOT_EQUAL},
-	{'^<=', OPERATOR, operators.LESS_THAN_EQUAL},
-	{'^>=', OPERATOR, operators.GREATER_THAN_EQUAL},
-	{'^%.%.%.', OPERATOR, operators.VAR_ARG},
-	{'^%.%.', OPERATOR, operators.CONCATENATE},
-	{'^++', OPERATOR, operators.PLUS_PLUS},
-	{'^%-%-', OPERATOR, operators.MINUS_MINUS},
-	{'^+=', OPERATOR, operators.PLUS_EQUAL},
-	{'^%-=', OPERATOR, operators.MINUS_EQUAL},
-	{'^*=', OPERATOR, operators.MULTIPLY_EQUAL},
-	{'^/=', OPERATOR, operators.DIVIDE_EQUAL},
-	{'^%%=', OPERATOR, operators.MODULUS_EQUAL},
-	{'^%^=', OPERATOR, operators.EXPONENT_EQUAL},
-	{'^=', OPERATOR, operators.EQUAL},
-	{'^+', OPERATOR, operators.PLUS},
-	{'^*', OPERATOR, operators.MULTIPLY},
-	{'^%-', OPERATOR, operators.MINUS},
-	{'^#', OPERATOR, operators.HASH},
-	{'^/', OPERATOR, operators.DIVIDE},
-	{'^%%', OPERATOR, operators.MODULUS},
-	{'^%^', OPERATOR, operators.EXPONENT},
-	{'^>', OPERATOR, operators.GREATHER_THAN},
-	{'^<', OPERATOR, operators.LESS_THAN},
-	{'^%.', OPERATOR, operators.DOT},
-	{'^%[', OPERATOR, operators.SQUARE_BRACKET_LEFT},
-	{'^%]', OPERATOR, operators.SQUARE_BRACKET_RIGHT},
-	{'^%(', OPERATOR, operators.ROUND_BRACKET_LEFT},
-	{'^%)', OPERATOR, operators.ROUND_BRACKET_RIGHT},
-	{'^{', OPERATOR, operators.CURLY_BRACKET_LEFT},
-	{'^}', OPERATOR, operators.CURLY_BRACKET_RIGHT},
-	{'^,', OPERATOR, operators.COMMA},
+	{'%s+', nil, nil}, -- whitespace
+	{'0x[%da-fA-F]+', NUMBER, tonumber}, -- hex numbers
+	{'[%a_][%w_]*', IDENTIFIER, filterIdentifier}, -- identifiers
+	{'%d+%.?%d*[eE][%+%-]?%d+', NUMBER, tonumber}, -- scientific numbers
+	{'%d+%.?%d*', NUMBER, tonumber}, -- decimal numbers
+	{"(['\"])%1", STRING, ""}, -- empty string
+	{[[(['"])(\*)%2%1]], STRING, filterString}, -- string
+	{[[(['"]).-[^\](\*)%2%1]], STRING, filterString}, -- string with escapes
+	{'%-%-%[(=*)%[.-%]%1%]', nil, nil}, -- multi-line comment
+	{'%-%-.-\n', nil, nil}, -- single line comment
+	{'%[(=*)%[.-%]%1%]', STRING, filterLongString}, -- multi-line string
+	{':', OPERATOR, operators.TYPE_SET},
+	{'?', OPERATOR, operators.OPTIONAL},
+	{'==', OPERATOR, operators.DOUBLE_EQUAL},
+	{'~=', OPERATOR, operators.NOT_EQUAL},
+	{'<=', OPERATOR, operators.LESS_THAN_EQUAL},
+	{'>=', OPERATOR, operators.GREATER_THAN_EQUAL},
+	{'%.%.%.', OPERATOR, operators.VAR_ARG},
+	{'%.%.', OPERATOR, operators.CONCATENATE},
+	{'++', OPERATOR, operators.PLUS_PLUS},
+	{'%-%-', OPERATOR, operators.MINUS_MINUS},
+	{'+=', OPERATOR, operators.PLUS_EQUAL},
+	{'%-=', OPERATOR, operators.MINUS_EQUAL},
+	{'*=', OPERATOR, operators.MULTIPLY_EQUAL},
+	{'/=', OPERATOR, operators.DIVIDE_EQUAL},
+	{'%%=', OPERATOR, operators.MODULUS_EQUAL},
+	{'%^=', OPERATOR, operators.EXPONENT_EQUAL},
+	{'=', OPERATOR, operators.EQUAL},
+	{'+', OPERATOR, operators.PLUS},
+	{'*', OPERATOR, operators.MULTIPLY},
+	{'%-', OPERATOR, operators.MINUS},
+	{'#', OPERATOR, operators.HASH},
+	{'/', OPERATOR, operators.DIVIDE},
+	{'%%', OPERATOR, operators.MODULUS},
+	{'%^', OPERATOR, operators.EXPONENT},
+	{'>', OPERATOR, operators.GREATHER_THAN},
+	{'<', OPERATOR, operators.LESS_THAN},
+	{'%.', OPERATOR, operators.DOT},
+	{'%[', OPERATOR, operators.SQUARE_BRACKET_LEFT},
+	{'%]', OPERATOR, operators.SQUARE_BRACKET_RIGHT},
+	{'%(', OPERATOR, operators.ROUND_BRACKET_LEFT},
+	{'%)', OPERATOR, operators.ROUND_BRACKET_RIGHT},
+	{'{', OPERATOR, operators.CURLY_BRACKET_LEFT},
+	{'}', OPERATOR, operators.CURLY_BRACKET_RIGHT},
+	{',', OPERATOR, operators.COMMA},
 }
 
 local m = 0
@@ -188,7 +188,7 @@ function lex(code)
 	while charIndex <= codeLength do
 		local matched = false
 		for i, tokenMatch in ipairs(tokenMatches) do
-			local startIndex, endIndex, findMatch = stringFind(code, tokenMatch[1], charIndex)
+			local startIndex, endIndex, findMatch = stringFind(code, "^" .. tokenMatch[1], charIndex)
 			if startIndex then
 				local tokenType = tokenMatch[2]
 				local value = stringSub(code, startIndex, endIndex)
