@@ -1,3 +1,10 @@
+enum SubmissionState
+	complete,
+	sent,
+	networkError(String),
+	validationError(String),
+end
+
 class Person: Object
 
 	property isMale: Boolean? -- allows nil
