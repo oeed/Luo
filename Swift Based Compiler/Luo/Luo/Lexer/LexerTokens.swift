@@ -8,9 +8,15 @@
 
 import Foundation
 
-protocol TokenValue {}
+enum Token {
+	case number(Double)
+	case string(String)
+	case keyword(Keyword)
+	case identifier(String)
+	case `operator`(Operator)
+}
 
-enum OperatorValue: TokenValue {
+enum Operator {
 	case typeSet
 	case optional
 	case doubleEqual
@@ -47,22 +53,7 @@ enum OperatorValue: TokenValue {
 	case comma
 }
 
-enum NumberValue: TokenValue {
-	case decimal(Double)
-	case hexadecimal(Double)
-	case scientific(Double)
-}
-
-enum StringValue: TokenValue {
-	case singleLine(String)
-	case multiLine(String)
-}
-
-enum IdentifierValue: TokenValue {
-	case identifier(String)
-}
-
-enum KeywordValue: String, TokenValue {
+enum Keyword: String {
 	case and = "and"
 	case `break` = "break"
 	case `do` = "do"
@@ -89,4 +80,5 @@ enum KeywordValue: String, TokenValue {
 	case `enum` = "enum"
 }
 
-typealias TokenMatch = (pattern: String, value: TokenValue)
+typealias FilteredTokenMatch = (pattern: String, filter: (String) -> Token?)
+typealias TokenMatch = (pattern: String, token: Token?)
