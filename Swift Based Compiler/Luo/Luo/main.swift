@@ -9,4 +9,8 @@
 import Foundation
 
 print("Hello, World!")
+let lexer = Lexer(path: "~/Dropbox/Documents/Projects/Luo/Lexer/Example.luo")!
 
+for token in lexer {
+	print(token)
+}
