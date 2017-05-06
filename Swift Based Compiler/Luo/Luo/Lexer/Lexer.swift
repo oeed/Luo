@@ -21,9 +21,28 @@ struct LexerIterator: IteratorProtocol {
 		index = lexer.source.startIndex
 	}
 	
-	mutating func next() -> Token? {
-		return lexer.token(at: &index)
+	mutating func next() -> Token?? {
+		do {
+			return try lexer.token(at: &index)
+		}
+		catch LexerError.unexpectedCharacter(let position) {
+			print("error at \(position.line), \(position.column)")
+			return nil
+		}
 	}
+	
+}
+
+struct Position {
+	
+	let line: Int
+	let column: Int
+	
+}
+
+enum LexerError: Error {
+	
+	case unexpectedCharacter(Position)
 	
 }
 
@@ -31,8 +50,21 @@ struct Lexer: Sequence {
 	
 	let source: String
 	
+	private let lineRanges: [ClosedRange<String.Index>]
+	
 	init(source: String) {
 		self.source = source
+		
+		var startIndex = source.startIndex
+		var lineRanges = [ClosedRange<String.Index>]()
+		for line in source.components(separatedBy: "\n") {
+			let range = startIndex ... (source.index(startIndex, offsetBy: line.characters.count, limitedBy: source.endIndex) ?? source.endIndex)
+			lineRanges.append(range)
+			if range.upperBound < source.endIndex {
+				startIndex = source.index(after: range.upperBound)
+			}
+		}
+		self.lineRanges = lineRanges
 	}
 	
 	func makeIterator() -> LexerIterator {
@@ -40,25 +72,43 @@ struct Lexer: Sequence {
 	}
 	
 	init?(path: String) {
-		if let source = try? String.init(contentsOfFile: path) {
+		if let source = try? String(contentsOfFile: path) {
 			self.init(source: source)
+		}
+		else {
+			return nil
+		}
+	}
+	
+	func position(of index: String.Index) -> Position? {
+		for (line, range) in lineRanges.enumerated() {
+			if range ~= index {
+				return Position(line: line + 1, column: source.distance(from: range.lowerBound, to: index))
+			}
 		}
 		return nil
 	}
 	
-	func token(at index: inout String.Index) -> Token? {
+	func token(at index: inout String.Index) throws -> Token?? {
+		if index == source.endIndex {
+			return nil
+		}
+		print("#" + source.substring(with: index ..< source.endIndex))
 		for tokenMatch in tokenMatches {
-			let str: String = ""
-			if let range = source.range(of: tokenMatch.pattern, options: .regularExpression, range: index..<str.endIndex, locale: nil) {
+			print(tokenMatch.pattern)
+			if let range = source.range(of: "^" + tokenMatch.pattern, options: .regularExpression, range: index ..< source.endIndex, locale: nil) {
 				// the is our next match
+				index = source.index(range.upperBound, offsetBy: 1, limitedBy: source.endIndex) ?? source.endIndex
 				if tokenMatch is FilteredTokenMatch {
-					//					match.range
-					index = source.index(after: range.upperBound)
-					return (tokenMatch as! FilteredTokenMatch).filter(source.substring(with: range), "")
+					return Optional((tokenMatch as! FilteredTokenMatch).filter(source.substring(with: range), ""))
+				}
+				else {
+					print(source.substring(with: range))
+					return Optional<Token?>((tokenMatch as! TokenMatch).token)
 				}
 			}
 		}
-		return nil
+		throw LexerError.unexpectedCharacter(position(of: index)!)
 	}
 	
 }
