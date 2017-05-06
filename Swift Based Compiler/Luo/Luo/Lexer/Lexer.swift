@@ -8,6 +8,19 @@
 
 import Foundation
 
+struct Position {
+	
+	let line: Int
+	let column: Int
+	
+}
+
+enum LexerError: Error {
+	
+	case unexpectedCharacter(Position)
+	
+}
+
 struct LexerIterator: IteratorProtocol {
 	
 	let lexer: Lexer
@@ -26,23 +39,14 @@ struct LexerIterator: IteratorProtocol {
 			return try lexer.token(at: &index)
 		}
 		catch LexerError.unexpectedCharacter(let position) {
-			print("error at \(position.line), \(position.column)")
+			print("Unknown character at: \(position.line), \(position.column)")
 			return nil
 		}
+		catch {
+			print("Uncaught error.")
+		}
+		return nil
 	}
-	
-}
-
-struct Position {
-	
-	let line: Int
-	let column: Int
-	
-}
-
-enum LexerError: Error {
-	
-	case unexpectedCharacter(Position)
 	
 }
 
@@ -93,9 +97,7 @@ struct Lexer: Sequence {
 		if index == source.endIndex {
 			return nil
 		}
-		print("#" + source.substring(with: index ..< source.endIndex))
 		for tokenMatch in tokenMatches {
-			print(tokenMatch.pattern)
 			if let range = source.range(of: "^" + tokenMatch.pattern, options: .regularExpression, range: index ..< source.endIndex, locale: nil) {
 				// the is our next match
 				index = source.index(range.upperBound, offsetBy: 1, limitedBy: source.endIndex) ?? source.endIndex
