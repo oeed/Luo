@@ -80,66 +80,83 @@ enum Keyword: String {
 	case `enum` = "enum"
 }
 
-typealias FilteredTokenMatch = (pattern: String, filter: (String) -> Token?)
+typealias FilteredTokenMatch = (pattern: String, filter: (String, String) -> Token?)
 typealias TokenMatch = (pattern: String, token: Token?)
 
 let tokenMatches = [
-	TokenMatch(pattern: "%s+", token: nil), // whitespace
-	FilteredTokenMatch(pattern: "0x[%da-fA-F]+", filter: {(_ match: String) -> Token? in
+	TokenMatch(pattern: "\\s+", token: nil), // whitespace
+	
+	FilteredTokenMatch(pattern: "0x[\\da-fA-F]+", filter: {(_ match: String, _) -> Token? in
 		//		TODO: in Lua this will be done by tonumber
 		return Token.number(42)
 	}), // hex numbers
-	FilteredTokenMatch(pattern: "[%a_][%w_]*", filter: {(_ identifier: String) -> Token? in
+	
+	FilteredTokenMatch(pattern: "[a-zA-Z_][\\w_]*", filter: {(_ identifier: String, _) -> Token? in
+		if let keyword = Keyword(rawValue: identifier) {
+			return Token.keyword(keyword)
+		}
 		return Token.identifier(identifier)
 	}), // identifiers
-	FilteredTokenMatch(pattern: "%d+%.?%d*[eE][%+%-]?%d+", filter: {(_ match: String) -> Token? in
+	
+	FilteredTokenMatch(pattern: "\\d+\\.?\\d*[eE][\\+\\-]?\\d+", filter: {(_ match: String, _) -> Token? in
 		//		TODO: in Lua this will be done by tonumber
 		return Token.number(42)
 	}), // scientific numbers
-	FilteredTokenMatch(pattern: "%d+%.?%d*", filter: {(_ match: String) -> Token? in
+	
+	FilteredTokenMatch(pattern: "\\d+\\.?\\d*", filter: {(_ match: String, _) -> Token? in
 		//		TODO: in Lua this will be done by tonumber
 		return Token.number(42)
 	}), // decimal numbers
-	TokenMatch(pattern: "(['\"])%1", token: Token.string("")), // empty string
-	//		FilteredTokenMatch(pattern: "[(['\"])(\*)%2%1", StringToken.singleLine), // string
-	//	FilteredTokenMatch(pattern: "(['\"]).-[^\](\*)%2%1", StringToken.singleLine), // string with escapes
-	TokenMatch(pattern: "%-%-%[(=*)%[.-%]%1%]", token: nil), // multi-line comment
-	TokenMatch(pattern: "%-%-.-\n", token: nil), // single line comment
-	FilteredTokenMatch(pattern: "%[(=*)%[.-%]%1%]", filter: {(_ match: String) -> Token? in
-		//		TODO: in Lua this will be done by tonumber
-		return Token.number(42)
+	
+	TokenMatch(pattern: "(['\"])\\1", token: Token.string("")), // empty string
+	
+	FilteredTokenMatch(pattern: "[(['\"])(\\*)\\2\\1", {(_ match: String, _) -> Token? in
+		return Token.string(match.substring(to: match.index(before: match.endIndex)))
+	}), // string
+	
+	FilteredTokenMatch(pattern: "(['\"]).-[^\\](\\*)\\2\\1", {(_ match: String, _) -> Token? in
+		return Token.string(match)
+	}), // string with escapes
+	
+	TokenMatch(pattern: "\\-\\-\\[(=*)\\[.-\\]\\1\\]", token: nil), // multi-line comment
+	
+	TokenMatch(pattern: "\\-\\-.-\n", token: nil), // single line comment
+	
+	FilteredTokenMatch(pattern: "\\[(=*)\\[.-\\]\\1\\]", filter: {(_ match: String, _ commentLevel: String) -> Token? in
+		return Token.string(match)
 	}), // multi-line string
+	
 	TokenMatch(pattern: ":", token: Token.operator(.typeSet)),
 	TokenMatch(pattern: "?", token: Token.operator(.optional)),
 	TokenMatch(pattern: "==", token: Token.operator(.doubleEqual)),
 	TokenMatch(pattern: "~=", token: Token.operator(.notEqual)),
 	TokenMatch(pattern: "<=", token: Token.operator(.lessThanEqual)),
 	TokenMatch(pattern: ">=", token: Token.operator(.greaterThanEqual)),
-	TokenMatch(pattern: "%.%.%.", token: Token.operator(.varArg)),
-	TokenMatch(pattern: "%.%.", token: Token.operator(.concatenate)),
+	TokenMatch(pattern: "\\.\\.\\.", token: Token.operator(.varArg)),
+	TokenMatch(pattern: "\\.\\.", token: Token.operator(.concatenate)),
 	TokenMatch(pattern: "++", token: Token.operator(.plusPlus)),
-	TokenMatch(pattern: "%-%-", token: Token.operator(.minusMinus)),
+	TokenMatch(pattern: "\\-\\-", token: Token.operator(.minusMinus)),
 	TokenMatch(pattern: "+=", token: Token.operator(.plusEqual)),
-	TokenMatch(pattern: "%-=", token: Token.operator(.minusEqual)),
+	TokenMatch(pattern: "\\-=", token: Token.operator(.minusEqual)),
 	TokenMatch(pattern: "*=", token: Token.operator(.multiplyEqual)),
 	TokenMatch(pattern: "/=", token: Token.operator(.divideEqual)),
-	TokenMatch(pattern: "%%=", token: Token.operator(.modulusEqual)),
-	TokenMatch(pattern: "%^=", token: Token.operator(.exponentEqual)),
+	TokenMatch(pattern: "\\=", token: Token.operator(.modulusEqual)),
+	TokenMatch(pattern: "\\^=", token: Token.operator(.exponentEqual)),
 	TokenMatch(pattern: "=", token: Token.operator(.equal)),
 	TokenMatch(pattern: "+", token: Token.operator(.plus)),
 	TokenMatch(pattern: "*", token: Token.operator(.multiply)),
-	TokenMatch(pattern: "%-", token: Token.operator(.minus)),
+	TokenMatch(pattern: "\\-", token: Token.operator(.minus)),
 	TokenMatch(pattern: "#", token: Token.operator(.hash)),
 	TokenMatch(pattern: "/", token: Token.operator(.divide)),
-	TokenMatch(pattern: "%%", token: Token.operator(.modulus)),
-	TokenMatch(pattern: "%^", token: Token.operator(.exponent)),
+	TokenMatch(pattern: "%", token: Token.operator(.modulus)),
+	TokenMatch(pattern: "\\^", token: Token.operator(.exponent)),
 	TokenMatch(pattern: ">", token: Token.operator(.greatherThan)),
 	TokenMatch(pattern: "<", token: Token.operator(.lessThan)),
-	TokenMatch(pattern: "%.", token: Token.operator(.dot)),
-	TokenMatch(pattern: "%[", token: Token.operator(.squareBracketLeft)),
-	TokenMatch(pattern: "%]", token: Token.operator(.squareBracketRight)),
-	TokenMatch(pattern: "%(", token: Token.operator(.roundBracketLeft)),
-	TokenMatch(pattern: "%)", token: Token.operator(.roundBracketRight)),
+	TokenMatch(pattern: "\\.", token: Token.operator(.dot)),
+	TokenMatch(pattern: "\\[", token: Token.operator(.squareBracketLeft)),
+	TokenMatch(pattern: "\\]", token: Token.operator(.squareBracketRight)),
+	TokenMatch(pattern: "\\(", token: Token.operator(.roundBracketLeft)),
+	TokenMatch(pattern: "\\)", token: Token.operator(.roundBracketRight)),
 	TokenMatch(pattern: "{", token: Token.operator(.curlyBracketLeft)),
 	TokenMatch(pattern: "}", token: Token.operator(.curlyBracketRight)),
 	TokenMatch(pattern: ",", token: Token.operator(.comma))
