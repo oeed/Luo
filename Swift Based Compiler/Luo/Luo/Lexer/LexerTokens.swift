@@ -8,7 +8,7 @@
 
 import Foundation
 
-enum TokenTypes {
+enum TokenType {
 	case identifier
 	case keyword
 	case string
@@ -16,7 +16,7 @@ enum TokenTypes {
 	case `operator`
 }
 
-enum TokenKeys {
+enum TokenKey {
 	case type
 	case value
 	case lineNumber
@@ -26,7 +26,7 @@ enum TokenKeys {
 	case originalValue
 }
 
-enum Operators {
+enum Operator {
 	case typeSet
 	case optional
 	case doubleEqual
@@ -63,7 +63,7 @@ enum Operators {
 	case comma
 }
 
-enum Keywords: String {
+enum Keyword: String {
 	case and = "and"
 	case `break` = "break"
 	case `do` = "do"
