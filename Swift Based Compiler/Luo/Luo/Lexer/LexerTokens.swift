@@ -137,11 +137,11 @@ let tokenMatches: [TokenMatchable] = [
 	
 	TokenMatch("(['\"])\\1", Token.string("")), // empty string
 	
-	FilteredTokenMatch("[(['\"])(\\*)\\2\\1") {(_ match: String, _) -> Token? in // string
+	FilteredTokenMatch("(['\"]).*?[^\\\\](\\*)\\2\\1") {(_ match: String, _) -> Token? in // string
 		return Token.string(match.substring(to: match.index(before: match.endIndex)))
 	},
 	
-	FilteredTokenMatch("(['\"]).*?[^\\](\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
+	FilteredTokenMatch("(['\"]).*?(\\\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
 		return Token.string(match)
 	},
 	
