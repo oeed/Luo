@@ -125,7 +125,7 @@ let tokenMatches: [TokenMatchable] = [
 		return Token.identifier(identifier)
 	},
 	
-	FilteredTokenMatch("\\d+\\.?\\d*[eE][\\+\\-]?\\d+") {(_ match: String, _) -> Token? in // scientific numbers
+	FilteredTokenMatch("\\d+\\.?\\d*[eE][\\+-]?\\d+") {(_ match: String, _) -> Token? in // scientific numbers
 		//		TODO: in Lua this will be done by tonumber
 		return Token.number(42)
 	},
@@ -141,38 +141,38 @@ let tokenMatches: [TokenMatchable] = [
 		return Token.string(match.substring(to: match.index(before: match.endIndex)))
 	},
 	
-	FilteredTokenMatch("(['\"]).-[^\\](\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
+	FilteredTokenMatch("(['\"]).*?[^\\](\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
 		return Token.string(match)
 	},
 	
-	TokenMatch("\\-\\-\\[(=*)\\[.-\\]\\1\\]"), // multi-line comment
+	TokenMatch("--\\[(=*)\\[.*?\\]\\1\\]"), // multi-line comment
 	
-	TokenMatch("\\-\\-.-\n"), // single line comment
+	TokenMatch("--.*?\n"), // single line comment
 	
-	FilteredTokenMatch("\\[(=*)\\[.-\\]\\1\\]") {(_ match: String, _ commentLevel: String) -> Token? in // multi-line string
+	FilteredTokenMatch("\\[(=*)\\[.*?\\]\\1\\]") {(_ match: String, _ commentLevel: String) -> Token? in // multi-line string
 		return Token.string(match)
 	},
 	
 	TokenMatch(":", Token.operator(.typeSet)),
-	TokenMatch("?", Token.operator(.optional)),
+	TokenMatch("\\?", Token.operator(.optional)),
 	TokenMatch("==", Token.operator(.doubleEqual)),
 	TokenMatch("~=", Token.operator(.notEqual)),
 	TokenMatch("<=", Token.operator(.lessThanEqual)),
 	TokenMatch(">=", Token.operator(.greaterThanEqual)),
 	TokenMatch("\\.\\.\\.", Token.operator(.varArg)),
 	TokenMatch("\\.\\.", Token.operator(.concatenate)),
-	TokenMatch("++", Token.operator(.plusPlus)),
-	TokenMatch("\\-\\-", Token.operator(.minusMinus)),
-	TokenMatch("+=", Token.operator(.plusEqual)),
-	TokenMatch("\\-=", Token.operator(.minusEqual)),
-	TokenMatch("*=", Token.operator(.multiplyEqual)),
+	TokenMatch("\\+\\+", Token.operator(.plusPlus)),
+	TokenMatch("--", Token.operator(.minusMinus)),
+	TokenMatch("\\+=", Token.operator(.plusEqual)),
+	TokenMatch("-=", Token.operator(.minusEqual)),
+	TokenMatch("\\*=", Token.operator(.multiplyEqual)),
 	TokenMatch("/=", Token.operator(.divideEqual)),
 	TokenMatch("\\=", Token.operator(.modulusEqual)),
 	TokenMatch("\\^=", Token.operator(.exponentEqual)),
 	TokenMatch("=", Token.operator(.equal)),
-	TokenMatch("+", Token.operator(.plus)),
-	TokenMatch("*", Token.operator(.multiply)),
-	TokenMatch("\\-", Token.operator(.minus)),
+	TokenMatch("\\+", Token.operator(.plus)),
+	TokenMatch("\\*", Token.operator(.multiply)),
+	TokenMatch("-", Token.operator(.minus)),
 	TokenMatch("#", Token.operator(.hash)),
 	TokenMatch("/", Token.operator(.divide)),
 	TokenMatch("%", Token.operator(.modulus)),
@@ -184,7 +184,7 @@ let tokenMatches: [TokenMatchable] = [
 	TokenMatch("\\]", Token.operator(.squareBracketRight)),
 	TokenMatch("\\(", Token.operator(.roundBracketLeft)),
 	TokenMatch("\\)", Token.operator(.roundBracketRight)),
-	TokenMatch("{", Token.operator(.curlyBracketLeft)),
+	TokenMatch("\\{", Token.operator(.curlyBracketLeft)),
 	TokenMatch("}", Token.operator(.curlyBracketRight)),
 	TokenMatch(",", Token.operator(.comma))
 ]
