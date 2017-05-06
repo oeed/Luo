@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		20DBD7EC1EAB3B21000F2E1C /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20DBD7EB1EAB3B21000F2E1C /* main.swift */; };
+		20EA717A1EBD6B5400DF2EC7 /* LexerTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA71791EBD6B5400DF2EC7 /* LexerTokens.swift */; };
+		20EA717C1EBD6B6400DF2EC7 /* Lexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA717B1EBD6B6400DF2EC7 /* Lexer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +27,8 @@
 /* Begin PBXFileReference section */
 		20DBD7E81EAB3B21000F2E1C /* Luo */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Luo; sourceTree = BUILT_PRODUCTS_DIR; };
 		20DBD7EB1EAB3B21000F2E1C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		20EA71791EBD6B5400DF2EC7 /* LexerTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = LexerTokens.swift; path = Lexer/LexerTokens.swift; sourceTree = "<group>"; };
+		20EA717B1EBD6B6400DF2EC7 /* Lexer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Lexer.swift; path = Lexer/Lexer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,8 +62,26 @@
 			isa = PBXGroup;
 			children = (
 				20DBD7EB1EAB3B21000F2E1C /* main.swift */,
+				20EA71761EBD6A3300DF2EC7 /* Lexer */,
+				20EA71751EBD6A1300DF2EC7 /* Abstract Syntax Tree */,
 			);
 			path = Luo;
+			sourceTree = "<group>";
+		};
+		20EA71751EBD6A1300DF2EC7 /* Abstract Syntax Tree */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = "Abstract Syntax Tree";
+			sourceTree = "<group>";
+		};
+		20EA71761EBD6A3300DF2EC7 /* Lexer */ = {
+			isa = PBXGroup;
+			children = (
+				20EA717B1EBD6B6400DF2EC7 /* Lexer.swift */,
+				20EA71791EBD6B5400DF2EC7 /* LexerTokens.swift */,
+			);
+			name = Lexer;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -120,6 +142,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				20EA717A1EBD6B5400DF2EC7 /* LexerTokens.swift in Sources */,
+				20EA717C1EBD6B6400DF2EC7 /* Lexer.swift in Sources */,
 				20DBD7EC1EAB3B21000F2E1C /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -252,6 +276,7 @@
 				20DBD7F11EAB3B21000F2E1C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
