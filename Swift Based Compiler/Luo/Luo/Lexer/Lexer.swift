@@ -18,6 +18,7 @@ struct Position {
 enum LexerError: Error {
 	
 	case unexpectedCharacter(Position)
+	case endOfFile
 	
 }
 
@@ -34,14 +35,21 @@ struct LexerIterator: IteratorProtocol {
 		index = lexer.source.startIndex
 	}
 	
-	mutating func next() -> Token?? {
+	mutating func next() -> Token? {
 		do {
-			return try lexer.token(at: &index)
+			var token: Token?
+			repeat {
+				token = try lexer.token(at: &index)
+			}
+			while token == nil
+
+			return token
 		}
 		catch LexerError.unexpectedCharacter(let position) {
 			print("Unknown character at: \(position.line), \(position.column)")
 			return nil
 		}
+		catch LexerError.endOfFile {}
 		catch {
 			print("Uncaught error.")
 		}
@@ -93,20 +101,19 @@ struct Lexer: Sequence {
 		return nil
 	}
 	
-	func token(at index: inout String.Index) throws -> Token?? {
+	func token(at index: inout String.Index) throws -> Token? {
 		if index == source.endIndex {
-			return nil
+			throw LexerError.endOfFile
 		}
 		for tokenMatch in tokenMatches {
 			if let range = source.range(of: "^" + tokenMatch.pattern, options: .regularExpression, range: index ..< source.endIndex, locale: nil) {
 				// the is our next match
-				index = source.index(range.upperBound, offsetBy: 1, limitedBy: source.endIndex) ?? source.endIndex
+				index = range.upperBound // source.index(range.upperBound, offsetBy: 1, limitedBy: source.endIndex) ?? source.endIndex
 				if tokenMatch is FilteredTokenMatch {
-					return Optional((tokenMatch as! FilteredTokenMatch).filter(source.substring(with: range), ""))
+					return (tokenMatch as! FilteredTokenMatch).filter(source.substring(with: range), "")
 				}
 				else {
-					print(source.substring(with: range))
-					return Optional<Token?>((tokenMatch as! TokenMatch).token)
+					return (tokenMatch as! TokenMatch).token
 				}
 			}
 		}
