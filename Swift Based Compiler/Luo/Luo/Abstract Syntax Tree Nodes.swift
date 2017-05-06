@@ -8,6 +8,16 @@
 
 import Foundation
 
-protocol Node {
+indirect enum Node {
 	
+	case block(Node.statement)
+	indirect enum statement {
+		case `do`(Node.statement)
+//		case set([Node.lhs], [Node.expression])
+	}
+//	indirect enum expression {
+//		
+//	}
+//	case lhs
+
 }
