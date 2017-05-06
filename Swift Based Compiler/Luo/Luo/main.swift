@@ -9,8 +9,16 @@
 import Foundation
 
 print("Hello, World!")
-let lexer = Lexer(path: "/Users/olivercooper/Dropbox/Documents/Projects/Luo/Lexer/Example.luo")!
-
-for token in lexer {
-	print(token)
+if CommandLine.arguments.count != 2 {
+    print("Expects 1 argument: luo <path>")
 }
+
+if let lexer = Lexer(path: CommandLine.arguments[1]) {
+    for token in lexer {
+        print(token)
+    }
+}
+else {
+    print("Unable to open file: " + CommandLine.arguments[1])
+}
+

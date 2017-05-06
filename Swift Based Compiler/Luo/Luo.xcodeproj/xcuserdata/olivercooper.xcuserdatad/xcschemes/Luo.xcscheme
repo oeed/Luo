@@ -61,6 +61,12 @@
             ReferencedContainer = "container:Luo.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "/Users/olivercooper/Dropbox/Documents/Projects/Luo/Lexer/Example.luo"
+            isEnabled = "YES">
+         </CommandLineArgument>
+      </CommandLineArguments>
       <AdditionalOptions>
       </AdditionalOptions>
    </LaunchAction>
