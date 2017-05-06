@@ -12,7 +12,7 @@ enum Token {
 	case number(Double)
 	case string(String)
 	case keyword(Keyword)
-	case identifier(String)
+	case identifier(Identifier)
 	case `operator`(Operator)
 }
 

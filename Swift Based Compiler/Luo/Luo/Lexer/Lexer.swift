@@ -42,7 +42,7 @@ struct LexerIterator: IteratorProtocol {
 				token = try lexer.token(at: &index)
 			}
 			while token == nil
-
+			
 			return token
 		}
 		catch LexerError.unexpectedCharacter(let position) {
