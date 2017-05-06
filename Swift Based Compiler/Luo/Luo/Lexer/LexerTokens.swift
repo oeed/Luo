@@ -110,7 +110,7 @@ struct TokenMatch: TokenMatchable {
 	
 }
 
-let tokenMatches = [
+let tokenMatches: [TokenMatchable] = [
 	TokenMatch("\\s+"), // whitespace
 	
 	FilteredTokenMatch("0x[\\da-fA-F]+") {(_ match: String, _) -> Token? in // hex numbers
@@ -187,4 +187,4 @@ let tokenMatches = [
 	TokenMatch("{", Token.operator(.curlyBracketLeft)),
 	TokenMatch("}", Token.operator(.curlyBracketRight)),
 	TokenMatch(",", Token.operator(.comma))
-	] as [Any]
+]
