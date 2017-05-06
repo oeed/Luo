@@ -8,25 +8,9 @@
 
 import Foundation
 
-enum TokenType {
-	case identifier
-	case keyword
-	case string
-	case number
-	case `operator`
-}
+protocol TokenValue {}
 
-enum TokenKey {
-	case type
-	case value
-	case lineNumber
-	case columnNumber
-	case startIndex
-	case endIndex
-	case originalValue
-}
-
-enum Operator {
+enum OperatorValue: TokenValue {
 	case typeSet
 	case optional
 	case doubleEqual
@@ -63,7 +47,22 @@ enum Operator {
 	case comma
 }
 
-enum Keyword: String {
+enum NumberValue: TokenValue {
+	case decimal(Double)
+	case hexadecimal(Double)
+	case scientific(Double)
+}
+
+enum StringValue: TokenValue {
+	case singleLine(String)
+	case multiLine(String)
+}
+
+enum IdentifierValue: TokenValue {
+	case identifier(String)
+}
+
+enum KeywordValue: String, TokenValue {
 	case and = "and"
 	case `break` = "break"
 	case `do` = "do"
@@ -89,3 +88,5 @@ enum Keyword: String {
 	case `is` = "is"
 	case `enum` = "enum"
 }
+
+typealias TokenMatch = (pattern: String, value: TokenValue)
