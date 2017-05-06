@@ -185,6 +185,6 @@ let tokenMatches: [TokenMatchable] = [
 	TokenMatch("\\(", Token.operator(.roundBracketLeft)),
 	TokenMatch("\\)", Token.operator(.roundBracketRight)),
 	TokenMatch("\\{", Token.operator(.curlyBracketLeft)),
-	TokenMatch("}", Token.operator(.curlyBracketRight)),
+	TokenMatch("\\}", Token.operator(.curlyBracketRight)),
 	TokenMatch(",", Token.operator(.comma))
 ]
