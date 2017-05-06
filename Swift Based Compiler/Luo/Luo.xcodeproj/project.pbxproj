@@ -8,8 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		20DBD7EC1EAB3B21000F2E1C /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20DBD7EB1EAB3B21000F2E1C /* main.swift */; };
-		20EA717A1EBD6B5400DF2EC7 /* LexerTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA71791EBD6B5400DF2EC7 /* LexerTokens.swift */; };
+		20EA717A1EBD6B5400DF2EC7 /* Lexer Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA71791EBD6B5400DF2EC7 /* Lexer Tokens.swift */; };
 		20EA717C1EBD6B6400DF2EC7 /* Lexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA717B1EBD6B6400DF2EC7 /* Lexer.swift */; };
+		20EA717F1EBDE70700DF2EC7 /* Abstract Syntax Tree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA717E1EBDE70700DF2EC7 /* Abstract Syntax Tree.swift */; };
+		20EA71811EBDE73300DF2EC7 /* Abstract Syntax Tree Nodes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20EA71801EBDE73300DF2EC7 /* Abstract Syntax Tree Nodes.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -27,8 +29,10 @@
 /* Begin PBXFileReference section */
 		20DBD7E81EAB3B21000F2E1C /* Luo */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Luo; sourceTree = BUILT_PRODUCTS_DIR; };
 		20DBD7EB1EAB3B21000F2E1C /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
-		20EA71791EBD6B5400DF2EC7 /* LexerTokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = LexerTokens.swift; path = Lexer/LexerTokens.swift; sourceTree = "<group>"; };
+		20EA71791EBD6B5400DF2EC7 /* Lexer Tokens.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = "Lexer Tokens.swift"; path = "Lexer/Lexer Tokens.swift"; sourceTree = "<group>"; };
 		20EA717B1EBD6B6400DF2EC7 /* Lexer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Lexer.swift; path = Lexer/Lexer.swift; sourceTree = "<group>"; };
+		20EA717E1EBDE70700DF2EC7 /* Abstract Syntax Tree.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = "Abstract Syntax Tree.swift"; path = "Abstract Syntax Tree/Abstract Syntax Tree.swift"; sourceTree = "<group>"; };
+		20EA71801EBDE73300DF2EC7 /* Abstract Syntax Tree Nodes.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Abstract Syntax Tree Nodes.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +75,8 @@
 		20EA71751EBD6A1300DF2EC7 /* Abstract Syntax Tree */ = {
 			isa = PBXGroup;
 			children = (
+				20EA717E1EBDE70700DF2EC7 /* Abstract Syntax Tree.swift */,
+				20EA71801EBDE73300DF2EC7 /* Abstract Syntax Tree Nodes.swift */,
 			);
 			name = "Abstract Syntax Tree";
 			sourceTree = "<group>";
@@ -79,7 +85,7 @@
 			isa = PBXGroup;
 			children = (
 				20EA717B1EBD6B6400DF2EC7 /* Lexer.swift */,
-				20EA71791EBD6B5400DF2EC7 /* LexerTokens.swift */,
+				20EA71791EBD6B5400DF2EC7 /* Lexer Tokens.swift */,
 			);
 			name = Lexer;
 			sourceTree = "<group>";
@@ -142,8 +148,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				20EA717A1EBD6B5400DF2EC7 /* LexerTokens.swift in Sources */,
+				20EA71811EBDE73300DF2EC7 /* Abstract Syntax Tree Nodes.swift in Sources */,
+				20EA717A1EBD6B5400DF2EC7 /* Lexer Tokens.swift in Sources */,
 				20EA717C1EBD6B6400DF2EC7 /* Lexer.swift in Sources */,
+				20EA717F1EBDE70700DF2EC7 /* Abstract Syntax Tree.swift in Sources */,
 				20DBD7EC1EAB3B21000F2E1C /* main.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
