@@ -44,6 +44,10 @@ struct AbstractSyntaxTree {
 					return Statement.do(block: try block(), lexer.position(of: index)!)
 				case .while:
 					return Statement.while(condition: try expression(), block: try block(), lexer.position(of: index)!)
+				case .repeat:
+					return Statement.repeat(block: try block(), condition: try expression(), lexer.position(of: index)!)
+				case .if:
+					return try ifStatement(index)
 				case .end, .until, .else:
 					if expectBlockDelimiter {
 						return nil
@@ -61,6 +65,30 @@ struct AbstractSyntaxTree {
 	
 	mutating func expression() throws -> Expression {
 		return Expression.dots
+	}
+	
+	mutating func ifStatement(_ index: String.Index) throws -> Statement {
+		var conditionals = [(Expression, Block)]()
+		var elseBlock: Block?
+		eachCondition: while true {
+			conditionals.append((try expression(), try block()))
+			
+//			we need to check whether the ending keyword of the block was else or end, elseif will just loop again
+			switch iterator.lastToken!.1 {
+			case .keyword(let keyword):
+				switch keyword {
+				case .else:
+					elseBlock = try block()
+				case .until:
+					ParserError.unexpected(token: iterator.lastToken!.1)
+				case .end:
+					break eachCondition
+				default: break
+				}
+			default: break
+			}
+		}
+		return Statement.if(conditionals: conditionals, else: elseBlock, lexer.position(of: index)!)
 	}
 	
 }

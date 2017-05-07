@@ -30,6 +30,7 @@ struct LexerIterator: IteratorProtocol {
 	var index: String.Index
 	
 	var lineIndex: Int = 1
+	var lastToken: (String.Index, Token)?
 	
 	init(_ lexer: Lexer) {
 		self.lexer = lexer
@@ -45,8 +46,8 @@ struct LexerIterator: IteratorProtocol {
 				token = try lexer.token(at: &index)
 			}
 			while token == nil
-			
-			return (position!, token!)
+			lastToken = (position!, token!)
+			return lastToken
 		}
 		catch LexerError.unexpectedCharacter(let position) {
 			print("Unknown character at: \(position.line), \(position.column)")
