@@ -11,12 +11,12 @@ import Foundation
 
 enum Node {
 	
-	case block(Block, Position)
-    case statement(Block, Position)
-    case expression(Expression, Position)
-    case apply(Appliable, Position)
-    case identifier(Identifier, Position)
-    case assignee(Assignable, Position)
+	case block(Block)
+    case statement(Statement)
+    case expression(Expression)
+    case apply(Appliable)
+    case identifier(Identifier)
+    case assignee(Assignable)
 
 }
 
@@ -24,20 +24,20 @@ typealias Block = [Statement]
 typealias Label = String
 indirect enum Statement {
 	
-	case `do`(statements: [Statement])
-	case set(assignables: [Assignable], expressions: [Expression])
-	case `while`(condition: Expression, block: Block)
-	case `repeat`(block: Block, condition: Expression)
-	case `if`(conditionals: [(Expression, Block)], else: Block?)
-	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block)
-	case forIn(variables: [Identifier], iterators: [Identifier], Block)
-	case local(variables: [Identifier], value: [Expression])
-	case localFunction(name: Identifier, block: Block)
-    case goto(label: Label)
-    case label(Label)
-    case `return`([Expression])
-    case `break`
-    case apply(Appliable)
+	case `do`(block: Block, Position)
+	case set(assignables: [Assignable], expressions: [Expression], Position)
+	case `while`(condition: Expression, block: Block, Position)
+	case `repeat`(block: Block, condition: Expression, Position)
+	case `if`(conditionals: [(Expression, Block)], else: Block?, Position)
+	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block, Position)
+    case forIn(variables: [Identifier], iterators: [Identifier], block: Block, Position)
+	case local(variables: [Identifier], value: [Expression], Position)
+	case localFunction(name: Identifier, block: Block, Position)
+    case goto(label: Label, Position)
+    case label(Label, Position)
+    case `return`([Expression], Position)
+    case `break`(Position)
+    case apply(Appliable, Position)
     
 }
 
