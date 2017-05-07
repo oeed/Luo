@@ -12,6 +12,7 @@ struct Position {
 	
 	let line: Int
 	let column: Int
+    let lexer: Lexer
 	
 }
 
@@ -95,7 +96,7 @@ struct Lexer: Sequence {
 	func position(of index: String.Index) -> Position? {
 		for (line, range) in lineRanges.enumerated() {
 			if range ~= index {
-				return Position(line: line + 1, column: source.distance(from: range.lowerBound, to: index))
+                return Position(line: line + 1, column: source.distance(from: range.lowerBound, to: index), lexer: self)
 			}
 		}
 		return nil
