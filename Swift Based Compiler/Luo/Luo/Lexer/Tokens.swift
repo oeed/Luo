@@ -167,7 +167,7 @@ let tokenMatches: [TokenMatchable] = [
 	TokenMatch("-=", Token.operator(.minusEqual)),
 	TokenMatch("\\*=", Token.operator(.multiplyEqual)),
 	TokenMatch("/=", Token.operator(.divideEqual)),
-	TokenMatch("\\=", Token.operator(.modulusEqual)),
+	TokenMatch("%=", Token.operator(.modulusEqual)),
 	TokenMatch("\\^=", Token.operator(.exponentEqual)),
 	TokenMatch("=", Token.operator(.equal)),
 	TokenMatch("\\+", Token.operator(.plus)),
