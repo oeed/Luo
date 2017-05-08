@@ -30,7 +30,7 @@ indirect enum Statement {
 	case `repeat`(block: Block, condition: Expression, Position)
 	case `if`(conditionals: [(Expression, Block)], else: Block?, Position)
 	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block, Position)
-    case forIn(variables: [Identifier], iterators: [Identifier], block: Block, Position)
+    case forIn(variables: [Identifier], iterators: [Expression], block: Block, Position)
 	case local(variables: [Identifier], value: [Expression], Position)
 	case localFunction(name: Identifier, block: Block, Position)
     case goto(label: Label, Position)

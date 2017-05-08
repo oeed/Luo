@@ -14,6 +14,14 @@ enum ParserError: Error {
     case endOfStream
 }
 
+extension Collection where Indices.Iterator.Element == Index {
+	
+	/// Returns the element at the specified index iff it is within bounds, otherwise nil.
+	subscript (safe index: Index) -> Generator.Element? {
+		return indices.contains(index) ? self[index] : nil
+	}
+}
+
 struct AbstractSyntaxTree {
     
     let tree = [Node]()
@@ -76,6 +84,7 @@ struct AbstractSyntaxTree {
     }
 	
 	mutating func expression() throws -> Expression {
+		iterator.next()
 		return Expression.dots
 	}
 	
@@ -153,7 +162,45 @@ struct AbstractSyntaxTree {
 			}
 		}
 		
-		return Statement.break(lexer.position(of: index)!)
+//		we have all of the variables now
+//		now we need 2 - 3 expressions for numerical or 1+ expressions for non-numerical
+		var iterators = [Expression]()
+		iterators: while true {
+				iterators.append(try expression())
+				if let token = iterator.next() {
+					token: switch token.1 {
+					case .operator(let op):
+						switch op {
+						case .comma:
+							if isNumerical! && iterators.count >= 3 {
+								throw ParserError.unexpected(token: token.1) // we already have three expressions, we can't have a fourth. error
+							}
+							continue
+						default:
+							throw ParserError.unexpected(token: token.1)
+						}
+					case .keyword(let keyword):
+						switch keyword {
+						case .do:
+							if isNumerical! && iterators.count < 2 {
+								throw ParserError.unexpected(token: token.1) // we don't have at least two expressions. error.
+							}
+							break iterators // we have reached the `do`, get out and read the block
+						default:
+							throw ParserError.unexpected(token: token.1)
+						}
+					default:
+						throw ParserError.unexpected(token: token.1)
+					}
+				}
+		}
+		
+		if isNumerical! {
+			return Statement.forNumerical(variable: variables[0], start: iterators[0], stop: iterators[1], increment: iterators[safe: 2], block: try block(), lexer.position(of: index)!)
+		}
+		else {
+			return Statement.forIn(variables: variables, iterators: iterators, block: try block(), lexer.position(of: index)!)
+		}
 	}
 	
 }

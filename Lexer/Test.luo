@@ -1,3 +1,2 @@
-for k, v in ipairs(table_name) do
-	-- Code here...
+for i = 1, 10 do
 end
