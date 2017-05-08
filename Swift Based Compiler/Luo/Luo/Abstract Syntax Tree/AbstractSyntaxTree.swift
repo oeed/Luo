@@ -27,17 +27,17 @@ struct AbstractSyntaxTree {
 		try block()
     }
     
-    mutating func block() throws -> Block {
+    mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
         var statements = [Statement]()
-        while let statement = try statement(true) {
+		while let statement = try statement(endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
             statements.append(statement)
         }
         return statements
     }
 	
-    mutating func statement(_ expectBlockDelimiter: Bool = false) throws -> Statement? {
+    mutating func statement(endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {
         while let (index, token) = iterator.next() {
-            switch token {
+			token: switch token {
             case .keyword(let keyword):
                 switch keyword {
                 case .do:
@@ -45,14 +45,26 @@ struct AbstractSyntaxTree {
 				case .while:
 					return Statement.while(condition: try expression(), block: try block(), lexer.position(of: index)!)
 				case .repeat:
-					return Statement.repeat(block: try block(), condition: try expression(), lexer.position(of: index)!)
+					return Statement.repeat(block: try block(endDelimiter: false, untilDelimiter: true), condition: try expression(), lexer.position(of: index)!)
 				case .if:
 					return try ifStatement(index)
-				case .end, .until, .else:
-					if expectBlockDelimiter {
+				case .for:
+					return try forStatement(index)
+				case .end:
+					if endDelimiter {
 						return nil
 					}
-					throw ParserError.unexpected(token: token)
+					fallthrough //throw ParserError.unexpected(token: token)
+				case .else, .elseif:
+					if elseDelimiter {
+						return nil
+					}
+					fallthrough //throw ParserError.unexpected(token: token)
+				case .until:
+					if untilDelimiter {
+						return nil
+					}
+					fallthrough //throw ParserError.unexpected(token: token)
                 default:
                     throw ParserError.unexpected(token: token)
                 }
@@ -71,16 +83,13 @@ struct AbstractSyntaxTree {
 		var conditionals = [(Expression, Block)]()
 		var elseBlock: Block?
 		eachCondition: while true {
-			conditionals.append((try expression(), try block()))
-			
+			conditionals.append((try expression(), try block(elseDelimiter: true)))
 //			we need to check whether the ending keyword of the block was else or end, elseif will just loop again
 			switch iterator.lastToken!.1 {
 			case .keyword(let keyword):
 				switch keyword {
 				case .else:
 					elseBlock = try block()
-				case .until:
-					ParserError.unexpected(token: iterator.lastToken!.1)
 				case .end:
 					break eachCondition
 				default: break
@@ -89,6 +98,62 @@ struct AbstractSyntaxTree {
 			}
 		}
 		return Statement.if(conditionals: conditionals, else: elseBlock, lexer.position(of: index)!)
+	}
+	
+	mutating func forStatement(_ index: String.Index) throws -> Statement {
+		// at this stage we've no idea whether the for loop is a 'for a in b` or `for i = a, b`
+		var variables = [Identifier]()
+		var isNumerical: Bool?
+		var expectComma = false
+		variables: while true {
+			if let token = iterator.next() {
+				token: switch token.1 {
+				case .identifier(let identifier):
+					if isNumerical != nil, isNumerical! {
+						throw ParserError.unexpected(token: token.1)
+					} // numerical loops shouldn't have more than one variable
+					variables.append(identifier)
+					expectComma = true
+				case .operator(let op):
+					switch op {
+						case .comma:
+							if expectComma {
+								expectComma = false // we have the comma, we can now expect another variable
+								isNumerical = false // we now also know that this is not a numerical loop
+								break token
+							}
+//							this comma shouldn't be here
+							break
+						case .equal:
+							if expectComma && (isNumerical == nil || isNumerical!) {
+								isNumerical = true
+								break variables // we've reached the end of the list of variables
+							}
+							break // this equal shouldn't be here
+						default: break
+					}
+					throw ParserError.unexpected(token: token.1)
+				case .keyword(let keyword):
+					switch keyword {
+					case .in:
+						if expectComma && (isNumerical == nil || !isNumerical!) {
+							isNumerical = false
+							break variables // we've reached the end of the list of variables
+						}
+						break  // this `in` shouldn't be here
+					default: break
+					}
+					fallthrough
+				default:
+					throw ParserError.unexpected(token: token.1)
+				}
+			}
+			else {
+				throw ParserError.endOfStream
+			}
+		}
+		
+		return Statement.break(lexer.position(of: index)!)
 	}
 	
 }
