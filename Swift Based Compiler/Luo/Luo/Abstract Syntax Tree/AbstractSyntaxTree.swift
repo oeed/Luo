@@ -31,7 +31,6 @@ struct AbstractSyntaxTree {
 	private let lexer: Lexer
 	
 	init(lexer: Lexer) throws {
-		var tree = [Node]()
 		iterator = lexer.makeIterator()
 		self.lexer = lexer
 		try block()
@@ -60,6 +59,11 @@ struct AbstractSyntaxTree {
 					return try ifStatement(index)
 				case .for:
 					return try forStatement(index)
+				case .break:
+					return Statement.break(lexer.position(of: index)!)
+				case .goto:
+					//					TODO: considering checking for Lua >= 5.2
+					return Statement.goto(label: try identifier(), lexer.position(of: index)!)
 				case .end:
 					if endDelimiter {
 						return nil
@@ -92,6 +96,18 @@ struct AbstractSyntaxTree {
 			}
 		}
 		return nil
+	}
+	
+	mutating func identifier() throws -> Identifier {
+		if let (_, token) = iterator.next() {
+			switch token {
+			case .identifier(let identifier):
+				return identifier
+			default:
+				throw ParserError.unexpected(token: token)
+			}
+		}
+		throw ParserError.endOfStream
 	}
 	
 	mutating func expression() throws -> Expression {
@@ -215,3 +231,26 @@ struct AbstractSyntaxTree {
 	}
 	
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

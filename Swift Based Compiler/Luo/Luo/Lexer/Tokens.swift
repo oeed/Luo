@@ -79,6 +79,7 @@ enum Keyword: String {
 	case property = "property"
 	case `is` = "is"
 	case `enum` = "enum"
+	case goto = "goto"
 }
 
 protocol TokenMatchable {
