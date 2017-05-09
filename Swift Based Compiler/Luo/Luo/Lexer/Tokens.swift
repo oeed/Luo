@@ -17,7 +17,8 @@ enum Token {
 }
 
 enum Operator {
-	case typeSet
+	case colon
+	case semicolon
 	case optional
 	case doubleEqual
 	case notEqual
@@ -153,7 +154,8 @@ let tokenMatches: [TokenMatchable] = [
 		return Token.string(match)
 	},
 	
-	TokenMatch(":", Token.operator(.typeSet)),
+	TokenMatch(":", Token.operator(.colon)),
+	TokenMatch(";", Token.operator(.semicolon)),
 	TokenMatch("\\?", Token.operator(.optional)),
 	TokenMatch("==", Token.operator(.doubleEqual)),
 	TokenMatch("~=", Token.operator(.notEqual)),

@@ -28,6 +28,7 @@ struct LexerIterator: IteratorProtocol {
 	let lexer: Lexer
 	
 	var index: String.Index
+	private var previousIndex: String.Index?
 	
 	var lineIndex: Int = 1
 	var lastToken: (String.Index, Token)?
@@ -59,10 +60,12 @@ struct LexerIterator: IteratorProtocol {
 		}
 		return nil
 	}
-    
-//    mutating func next() -> Token? {
-//        return next()?.1
-//    }
+	
+	mutating func undo() {
+		if previousIndex != nil {
+			index = previousIndex!
+		}
+	}
 	
 }
 

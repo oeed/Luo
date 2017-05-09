@@ -10,45 +10,63 @@ import Foundation
 import Cocoa
 
 enum ParserError: Error {
-    case unexpected(token: Token)
-    case endOfStream
+	case unexpected(token: Token)
+	case endOfStream
 }
 
 extension Collection where Indices.Iterator.Element == Index {
 	
 	/// Returns the element at the specified index iff it is within bounds, otherwise nil.
+	/// Thanks to: http://stackoverflow.com/questions/25329186/safe-bounds-checked-array-lookup-in-swift-through-optional-bindings
 	subscript (safe index: Index) -> Generator.Element? {
 		return indices.contains(index) ? self[index] : nil
 	}
+	
 }
 
 struct AbstractSyntaxTree {
-    
-    let tree = [Node]()
-    private var iterator: LexerIterator
-    private let lexer: Lexer
-    
-    init(lexer: Lexer) throws {
-        var tree = [Node]()
-        iterator = lexer.makeIterator()
-        self.lexer = lexer
-		try block()
-    }
-    
-    mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
-        var statements = [Statement]()
-		while let statement = try statement(endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
-            statements.append(statement)
-        }
-        return statements
-    }
 	
-    mutating func statement(endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {
-        while let (index, token) = iterator.next() {
+	let tree = [Node]()
+	private var iterator: LexerIterator
+	private let lexer: Lexer
+	
+	init(lexer: Lexer) throws {
+		var tree = [Node]()
+		iterator = lexer.makeIterator()
+		self.lexer = lexer
+		try block()
+	}
+	
+	mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
+		var statements = [Statement]()
+		statement: while let statement = try statement(endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
+			statements.append(statement)
+			
+			// there might be a semi-colon after this statement, consume it if there is one
+			
+			if let (_, token) = iterator.next() {
+				switch token {
+				case .operator(let op):
+					switch op {
+					case .semicolon:
+						continue statement
+					default: break
+					}
+					fallthrough
+				default:
+					iterator.undo()
+				}
+			}
+		}
+		return statements
+	}
+	
+	mutating func statement(endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {
+		while let (index, token) = iterator.next() {
 			token: switch token {
-            case .keyword(let keyword):
-                switch keyword {
-                case .do:
+			case .keyword(let keyword):
+				switch keyword {
+				case .do:
 					return Statement.do(block: try block(), lexer.position(of: index)!)
 				case .while:
 					return Statement.while(condition: try expression(), block: try block(), lexer.position(of: index)!)
@@ -73,15 +91,17 @@ struct AbstractSyntaxTree {
 						return nil
 					}
 					fallthrough //throw ParserError.unexpected(token: token)
-                default:
-                    throw ParserError.unexpected(token: token)
-                }
-            default:
-                throw ParserError.unexpected(token: token)
-            }
-        }
-        return nil
-    }
+				case .local:
+					return Statement.goto(label: "one", lexer.position(of: index)!)
+				default:
+					throw ParserError.unexpected(token: token)
+				}
+			default:
+				throw ParserError.unexpected(token: token)
+			}
+		}
+		return nil
+	}
 	
 	mutating func expression() throws -> Expression {
 		iterator.next()
@@ -93,7 +113,7 @@ struct AbstractSyntaxTree {
 		var elseBlock: Block?
 		eachCondition: while true {
 			conditionals.append((try expression(), try block(elseDelimiter: true)))
-//			we need to check whether the ending keyword of the block was else or end, elseif will just loop again
+			//			we need to check whether the ending keyword of the block was else or end, elseif will just loop again
 			switch iterator.lastToken!.1 {
 			case .keyword(let keyword):
 				switch keyword {
@@ -125,21 +145,21 @@ struct AbstractSyntaxTree {
 					expectComma = true
 				case .operator(let op):
 					switch op {
-						case .comma:
-							if expectComma {
-								expectComma = false // we have the comma, we can now expect another variable
-								isNumerical = false // we now also know that this is not a numerical loop
-								break token
-							}
-//							this comma shouldn't be here
-							break
-						case .equal:
-							if expectComma && (isNumerical == nil || isNumerical!) {
-								isNumerical = true
-								break variables // we've reached the end of the list of variables
-							}
-							break // this equal shouldn't be here
-						default: break
+					case .comma:
+						if expectComma {
+							expectComma = false // we have the comma, we can now expect another variable
+							isNumerical = false // we now also know that this is not a numerical loop
+							break token
+						}
+						//							this comma shouldn't be here
+						break
+					case .equal:
+						if expectComma && (isNumerical == nil || isNumerical!) {
+							isNumerical = true
+							break variables // we've reached the end of the list of variables
+						}
+					break // this equal shouldn't be here
+					default: break
 					}
 					throw ParserError.unexpected(token: token.1)
 				case .keyword(let keyword):
@@ -149,7 +169,7 @@ struct AbstractSyntaxTree {
 							isNumerical = false
 							break variables // we've reached the end of the list of variables
 						}
-						break  // this `in` shouldn't be here
+					break  // this `in` shouldn't be here
 					default: break
 					}
 					fallthrough
@@ -162,37 +182,37 @@ struct AbstractSyntaxTree {
 			}
 		}
 		
-//		we have all of the variables now
-//		now we need 2 - 3 expressions for numerical or 1+ expressions for non-numerical
+		//		we have all of the variables now
+		//		now we need 2 - 3 expressions for numerical or 1+ expressions for non-numerical
 		var iterators = [Expression]()
 		iterators: while true {
-				iterators.append(try expression())
-				if let token = iterator.next() {
-					token: switch token.1 {
-					case .operator(let op):
-						switch op {
-						case .comma:
-							if isNumerical! && iterators.count >= 3 {
-								throw ParserError.unexpected(token: token.1) // we already have three expressions, we can't have a fourth. error
-							}
-							continue
-						default:
-							throw ParserError.unexpected(token: token.1)
+			iterators.append(try expression())
+			if let token = iterator.next() {
+				token: switch token.1 {
+				case .operator(let op):
+					switch op {
+					case .comma:
+						if isNumerical! && iterators.count >= 3 {
+							throw ParserError.unexpected(token: token.1) // we already have three expressions, we can't have a fourth. error
 						}
-					case .keyword(let keyword):
-						switch keyword {
-						case .do:
-							if isNumerical! && iterators.count < 2 {
-								throw ParserError.unexpected(token: token.1) // we don't have at least two expressions. error.
-							}
-							break iterators // we have reached the `do`, get out and read the block
-						default:
-							throw ParserError.unexpected(token: token.1)
-						}
+						continue
 					default:
 						throw ParserError.unexpected(token: token.1)
 					}
+				case .keyword(let keyword):
+					switch keyword {
+					case .do:
+						if isNumerical! && iterators.count < 2 {
+							throw ParserError.unexpected(token: token.1) // we don't have at least two expressions. error.
+						}
+						break iterators // we have reached the `do`, get out and read the block
+					default:
+						throw ParserError.unexpected(token: token.1)
+					}
+				default:
+					throw ParserError.unexpected(token: token.1)
 				}
+			}
 		}
 		
 		if isNumerical! {
