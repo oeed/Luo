@@ -70,7 +70,6 @@ struct AbstractSyntaxTree {
 					}
 				case .local:
 					return try local(index)
-				fallthrough //throw ParserError.unexpected(token: token)
 				case .else, .elseif:
 					if elseDelimiter {
 						return nil
