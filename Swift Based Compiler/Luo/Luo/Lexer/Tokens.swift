@@ -17,6 +17,7 @@ enum Token {
 }
 
 enum Operator {
+	case doubleColon
 	case colon
 	case semicolon
 	case optional
@@ -155,6 +156,7 @@ let tokenMatches: [TokenMatchable] = [
 		return Token.string(match)
 	},
 	
+	TokenMatch("::", Token.operator(.doubleColon)),
 	TokenMatch(":", Token.operator(.colon)),
 	TokenMatch(";", Token.operator(.semicolon)),
 	TokenMatch("\\?", Token.operator(.optional)),

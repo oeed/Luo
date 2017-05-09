@@ -34,7 +34,7 @@ indirect enum Statement {
 	case local(variables: [Identifier], value: [Expression], Position)
 	case localFunction(name: Identifier, block: Block, Position)
     case goto(label: Label, Position)
-    case label(Label, Position)
+	case label(label: Label, Position)
     case `return`([Expression], Position)
     case `break`(Position)
     case apply(Appliable, Position)

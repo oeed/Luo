@@ -79,13 +79,13 @@ struct AbstractSyntaxTree {
 						return nil
 					}
 					fallthrough //throw ParserError.unexpected(token: token)
-				case .local:
-					return Statement.goto(label: "one", lexer.position(of: index)!)
 				default:
 					throw ParserError.unexpected(token: token)
 				}
 			case .operator(let op):
 				switch op {
+				case .doubleColon:
+					return try label(index)
 				case .semicolon:
 					break
 				default:
@@ -96,6 +96,25 @@ struct AbstractSyntaxTree {
 			}
 		}
 		return nil
+	}
+	
+	
+	mutating func label(_ index: String.Index) throws -> Statement {
+		let label = Statement.label(label: try identifier(), lexer.position(of: index)!)
+		if let (_, token) = iterator.next() {
+			switch token {
+			case .operator(let op):
+				switch op {
+				case .doubleColon:
+					return label
+				default: break
+				}
+				fallthrough
+			default:
+				throw ParserError.unexpected(token: token)
+			}
+		}
+		throw ParserError.endOfStream
 	}
 	
 	mutating func identifier() throws -> Identifier {
