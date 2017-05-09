@@ -1,2 +1,1 @@
-goto label
-::test::
+local name, = one

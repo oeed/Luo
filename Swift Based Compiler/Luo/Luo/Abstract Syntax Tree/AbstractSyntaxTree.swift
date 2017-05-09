@@ -68,6 +68,8 @@ struct AbstractSyntaxTree {
 					if endDelimiter {
 						return nil
 					}
+				case .local:
+					return try local(index)
 				fallthrough //throw ParserError.unexpected(token: token)
 				case .else, .elseif:
 					if elseDelimiter {
@@ -99,7 +101,6 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
-	
 	mutating func label(_ index: String.Index) throws -> Statement {
 		let label = Statement.label(label: try identifier(), lexer.position(of: index)!)
 		if let (_, token) = iterator.next() {
@@ -130,9 +131,86 @@ struct AbstractSyntaxTree {
 		throw ParserError.endOfStream
 	}
 	
+	mutating func functionBody() throws -> Expression {
+		iterator.next()
+		return Expression.dots
+	}
+	
 	mutating func expression() throws -> Expression {
 		iterator.next()
 		return Expression.dots
+	}
+	
+	mutating func expressionList() throws -> [Expression] {
+		iterator.next()
+		return [Expression.dots]
+	}
+	
+	mutating func local(_ index: String.Index) throws -> Statement {
+		// we need to determine whether this is a local function declaration or variable
+		var isFunction: Bool?
+		var variables = [Identifier]()
+		var expectComma = false
+		while let (_, token) = iterator.next() {
+			token: switch token {
+			case .identifier(let identifier):
+				// local variable. there might be a comma with more variables this though
+				if isFunction != nil && isFunction! { // this local is a function, we will use this as the name
+					return .localFunction(name: identifier, function: try functionBody(), lexer.position(of: index)!)
+				}
+				else if expectComma == false {
+					variables.append(identifier)
+					expectComma = true
+					isFunction = false
+					break
+				}
+				throw ParserError.unexpected(token: token)
+			case .operator(let op):
+				if expectComma { // this only applies if we're not a function
+					switch op {
+					case .comma:
+						expectComma = false // we have the comma, we can now expect another variable
+						break token
+					case .equal:
+						return .local(variables: variables, values: try expressionList(), lexer.position(of: index)!)
+					default:
+						// this token isn't actually part of the local declaration. we need to unconsume it
+						iterator.undo()
+						return .local(variables: variables, values: [], lexer.position(of: index)!)
+					}
+				}
+				throw ParserError.unexpected(token: token)
+			case .keyword(let keyword):
+				if expectComma {
+					// this token isn't actually part of the local declaration. we need to unconsume it
+					iterator.undo()
+					return .local(variables: variables, values: [], lexer.position(of: index)!)
+				}
+				switch keyword {
+				case .function:
+					if isFunction == nil {
+						isFunction = true
+						break
+					}
+					fallthrough
+				default:
+					throw ParserError.unexpected(token: token)
+				}
+			default:
+				if expectComma {
+					// this token isn't actually part of the local declaration. we need to unconsume it
+					iterator.undo()
+					return .local(variables: variables, values: [], lexer.position(of: index)!)
+				}
+				throw ParserError.unexpected(token: token)
+			}
+		}
+		
+		if expectComma {
+			// the declaration is actually complete, we can return
+			return .local(variables: variables, values: [], lexer.position(of: index)!)
+		}
+		throw ParserError.endOfStream
 	}
 	
 	mutating func ifStatement(_ index: String.Index) throws -> Statement {
@@ -140,7 +218,7 @@ struct AbstractSyntaxTree {
 		var elseBlock: Block?
 		eachCondition: while true {
 			conditionals.append((try expression(), try block(elseDelimiter: true)))
-			//			we need to check whether the ending keyword of the block was else or end, elseif will just loop again
+			//	we need to check whether the ending keyword of the block was else or end, elseif will just loop again
 			switch iterator.lastToken!.1 {
 			case .keyword(let keyword):
 				switch keyword {
