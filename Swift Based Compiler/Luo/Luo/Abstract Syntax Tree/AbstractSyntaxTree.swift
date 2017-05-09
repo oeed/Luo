@@ -62,7 +62,7 @@ struct AbstractSyntaxTree {
 				case .break:
 					return Statement.break(lexer.position(of: index)!)
 				case .goto:
-					//					TODO: considering checking for Lua >= 5.2
+//					TODO: consider checking for Lua >= 5.2
 					return Statement.goto(label: try identifier(), lexer.position(of: index)!)
 				case .end:
 					if endDelimiter {
@@ -85,6 +85,7 @@ struct AbstractSyntaxTree {
 			case .operator(let op):
 				switch op {
 				case .doubleColon:
+//					TODO: consider checking for Lua >= 5.2
 					return try label(index)
 				case .semicolon:
 					break
