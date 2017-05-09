@@ -39,24 +39,8 @@ struct AbstractSyntaxTree {
 	
 	mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
 		var statements = [Statement]()
-		statement: while let statement = try statement(endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
+		while let statement = try statement(endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
 			statements.append(statement)
-			
-			// there might be a semi-colon after this statement, consume it if there is one
-			
-			if let (_, token) = iterator.next() {
-				switch token {
-				case .operator(let op):
-					switch op {
-					case .semicolon:
-						continue statement
-					default: break
-					}
-					fallthrough
-				default:
-					iterator.undo()
-				}
-			}
 		}
 		return statements
 	}
@@ -80,7 +64,7 @@ struct AbstractSyntaxTree {
 					if endDelimiter {
 						return nil
 					}
-					fallthrough //throw ParserError.unexpected(token: token)
+				fallthrough //throw ParserError.unexpected(token: token)
 				case .else, .elseif:
 					if elseDelimiter {
 						return nil
@@ -93,6 +77,13 @@ struct AbstractSyntaxTree {
 					fallthrough //throw ParserError.unexpected(token: token)
 				case .local:
 					return Statement.goto(label: "one", lexer.position(of: index)!)
+				default:
+					throw ParserError.unexpected(token: token)
+				}
+			case .operator(let op):
+				switch op {
+				case .semicolon:
+					break
 				default:
 					throw ParserError.unexpected(token: token)
 				}
