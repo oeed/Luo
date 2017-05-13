@@ -25,7 +25,7 @@ typealias Label = String
 indirect enum Statement {
 	
 	case `do`(block: Block, Position)
-	case assignment(assignables: [Expression], expressions: [Expression], Position)
+	case assignment(assignables: [Assignable], expressions: [Expression], Position)
 	case `while`(condition: Expression, block: Block, Position)
 	case `repeat`(block: Block, condition: Expression, Position)
 	case `if`(conditionals: [(Expression, Block)], else: Block?, Position)

@@ -122,11 +122,15 @@ struct AbstractSyntaxTree {
 						// TODO: check that issues with validateVar aren't present (maybe due to strict typing)
 						
 						// we are a variable assignment
-						var assignables: [Expression] = [prefix] // TODO: do we want Expressions with position information, or just Assignables
+						var assignables: [Assignable] = [assignable] // TODO: do we want Expressions with position information, or just Assignables
 
 						// get any subsequent variables
 						while consume(operator: .comma) {
-							assignables.append(try prefixExpression(iterator.index)) // TODO: double check this index is correct
+							switch try prefixExpression(iterator.index) {
+							case .prefix(let assignable, _):
+								assignables.append(assignable)
+							default: break
+							}
 						}
 						
 						try expect(operator: .equal)
@@ -150,7 +154,7 @@ struct AbstractSyntaxTree {
 			}
 		default:break
 		}
-		return Statement.break(lexer.position(of: index)!)
+		throw ParserError.endOfStream // TODO: don't think this should ever happen, maybe handle it differently
 	}
 	
 	mutating func expect(operator target: Operator) throws {
