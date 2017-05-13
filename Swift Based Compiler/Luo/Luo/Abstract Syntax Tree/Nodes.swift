@@ -52,7 +52,7 @@ indirect enum Expression: Assignable {
     case function([Identifier], isVarArg: Bool)
     case `operator`(NodeOperator, Expression, Expression?)
     case table([TableItem]) // table constructor
-    case brackets(Expression) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
+    case brackets(Expression, Position) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
     case apply(Appliable)
 	case variable(Assignable, Position)
     case prefix(Assignable, Position)

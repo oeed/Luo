@@ -11,6 +11,7 @@ import Cocoa
 
 enum ParserError: Error {
 	case unexpected(token: Token)
+	case invalid(variable: Assignable)
 	case endOfStream
 }
 
@@ -108,6 +109,12 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
+	func validate(variable: Assignable) throws {
+		if !(variable is ExpressionIndex || variable is IdentifierIndex || variable is Identifier) {
+			throw ParserError.invalid(variable: variable) // TODO: we probably need location information here
+		}
+	}
+	
 	mutating func assignmentOrFunctionCall(_ index: String.Index) throws -> Statement {
 		let prefix = try prefixExpression(index)
 		
@@ -119,15 +126,15 @@ struct AbstractSyntaxTree {
 				case .operator(let op):
 					switch op {
 					case .comma, .equal:
-						// TODO: check that issues with validateVar aren't present (maybe due to strict typing)
-						
 						// we are a variable assignment
-						var assignables: [Assignable] = [assignable] // TODO: do we want Expressions with position information, or just Assignables
+						try validate(variable: assignable)
+						var assignables: [Assignable] = [assignable]
 
 						// get any subsequent variables
 						while consume(operator: .comma) {
 							switch try prefixExpression(iterator.index) {
 							case .prefix(let assignable, _):
+								try validate(variable: assignable)
 								assignables.append(assignable)
 							default: break
 							}
@@ -198,7 +205,7 @@ struct AbstractSyntaxTree {
 			case .operator(let op):
 				switch op {
 				case .roundBracketLeft:
-					node = try expression()
+					node = Expression.brackets(try expression(), lexer.position(of: index)!)
 					try expect(operator: .roundBracketRight)
 					break token
 				default: break
