@@ -33,22 +33,15 @@ struct LexerIterator: IteratorProtocol {
 	var lineIndex: Int = 1
 	var lastToken: (String.Index, Token)?
 	
-	init(_ lexer: Lexer) {
-		self.lexer = lexer
-		index = lexer.source.startIndex
-	}
-	
-	mutating func next() -> (String.Index, Token)? {
+	var lookAhead: (String.Index, Token)? {
 		do {
 			var token: Token?
-            var position: String.Index?
-            repeat {
-                position = index
-				token = try lexer.token(at: &index)
+			var position = index
+			repeat {
+				token = try lexer.token(at: &position)
 			}
 			while token == nil
-			lastToken = (position!, token!)
-			return lastToken
+			return (position, token!)
 		}
 		catch LexerError.unexpectedCharacter(let position) {
 			print("Unknown character at: \(position.line), \(position.column)")
@@ -59,6 +52,27 @@ struct LexerIterator: IteratorProtocol {
 			print("Uncaught error.")
 		}
 		return nil
+	}
+	
+	init(_ lexer: Lexer) {
+		self.lexer = lexer
+		index = lexer.source.startIndex
+		previousIndex = index
+	}
+	
+	mutating func next() -> (String.Index, Token)? {
+		if lastToken != nil {
+			previousIndex = lastToken!.0
+		}
+		lastToken = lookAhead
+		if lastToken != nil {
+			index = lastToken!.0
+		}
+		return lastToken
+	}
+	
+	mutating func skip() {
+		let _ = next()
 	}
 	
 	mutating func undo() {

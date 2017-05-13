@@ -25,7 +25,7 @@ typealias Label = String
 indirect enum Statement {
 	
 	case `do`(block: Block, Position)
-	case set(assignables: [Assignable], expressions: [Expression], Position)
+	case assignment(assignables: [Expression], expressions: [Expression], Position)
 	case `while`(condition: Expression, block: Block, Position)
 	case `repeat`(block: Block, condition: Expression, Position)
 	case `if`(conditionals: [(Expression, Block)], else: Block?, Position)
@@ -41,7 +41,7 @@ indirect enum Statement {
     
 }
 
-indirect enum Expression {
+indirect enum Expression: Assignable {
 	
 	case `nil`
 	case dots
@@ -54,7 +54,8 @@ indirect enum Expression {
     case table([TableItem]) // table constructor
     case brackets(Expression) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
     case apply(Appliable)
-    case assignable(Assignable)
+	case variable(Assignable, Position)
+    case prefix(Assignable, Position)
 	
 }
 
@@ -97,27 +98,39 @@ enum TableItem {
 
 typealias Identifier = String
 
-protocol Appliable {}
+protocol Appliable: Assignable {
+
+	var callee: Assignable { get }
+	var arguments: [Expression] { get }
+
+}
 struct Call: Appliable {
     
-    let callee: Expression
+    let callee: Assignable
     let arguments: [Expression]
     
 }
 
-struct Invocation {
+struct Invocation: Appliable {
  
-    let callee: Expression
-    let method: String
+    let callee: Assignable
+    let method: Identifier
     let arguments: [Expression]
     
 }
 
 protocol Assignable {}
 extension Identifier: Assignable {}
-struct Index {
+struct ExpressionIndex: Assignable {
 	
-	let indexed: Expression
+	let indexed: Assignable
 	let index: Expression
+	
+}
+
+struct IdentifierIndex: Assignable {
+	
+	let indexed: Assignable
+	let index: Identifier
 	
 }

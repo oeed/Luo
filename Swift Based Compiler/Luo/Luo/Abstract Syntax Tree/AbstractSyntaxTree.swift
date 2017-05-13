@@ -90,14 +90,167 @@ struct AbstractSyntaxTree {
 					return try label(index)
 				case .semicolon:
 					break
+				case .roundBracketLeft:
+					// we're part of a prefix expression
+					iterator.undo()
+					return try assignmentOrFunctionCall(index)
 				default:
 					throw ParserError.unexpected(token: token)
 				}
+			case .identifier(_):
+				iterator.undo()
+				// we're part of a prefix expression
+				return try assignmentOrFunctionCall(index)
 			default:
 				throw ParserError.unexpected(token: token)
 			}
 		}
 		return nil
+	}
+	
+	mutating func assignmentOrFunctionCall(_ index: String.Index) throws -> Statement {
+		let prefix = try prefixExpression(index)
+		
+		switch prefix {
+		case .prefix(let assignable, _):
+			// this could be a variable list or function call
+			if let (_, lookAheadToken) = iterator.lookAhead {
+				switch lookAheadToken {
+				case .operator(let op):
+					switch op {
+					case .comma, .equal:
+						// TODO: check that issues with validateVar aren't present (maybe due to strict typing)
+						
+						// we are a variable assignment
+						var assignables: [Expression] = [prefix] // TODO: do we want Expressions with position information, or just Assignables
+
+						// get any subsequent variables
+						while consume(operator: .comma) {
+							assignables.append(try prefixExpression(iterator.index)) // TODO: double check this index is correct
+						}
+						
+						try expect(operator: .equal)
+						
+						// get the expressions for assignment
+						var expressions = [Expression]()
+						repeat {
+							expressions.append(try expression()) // TODO: double check this index is
+						}
+						while consume(operator: .comma)
+						
+						return Statement.assignment(assignables: assignables, expressions: expressions, lexer.position(of: index)!)
+					default: break // we are a function call (or invalid)
+					}
+				default: break // we are a function call (or invalid)
+				}
+			}
+			else {
+				// invalid, there should be a token here
+				throw ParserError.endOfStream
+			}
+		default:break
+		}
+		return Statement.break(lexer.position(of: index)!)
+	}
+	
+	mutating func expect(operator target: Operator) throws {
+		if let (_, token) = iterator.next() {
+			switch token {
+			case .operator(let op):
+				switch op {
+				case target: return
+				default: break
+				}
+			default: break
+			}
+			throw ParserError.unexpected(token: token)
+		}
+		throw ParserError.endOfStream
+	}
+	
+	mutating func consume(operator target: Operator) -> Bool {
+		if let (_, token) = iterator.lookAhead {
+			switch token {
+			case .operator(let op):
+				switch op {
+				case target:
+					// found what we're looking for, jump over it
+					iterator.skip()
+					return true
+				default: break
+				}
+			default: break
+			}
+		}
+		return false
+	}
+
+	mutating func prefixExpression(_ index: String.Index) throws -> Expression {
+		var node: Assignable
+		if let (_, token) = iterator.lookAhead {
+			token: switch token {
+			case .identifier(_):
+				node = try identifier()
+			case .operator(let op):
+				switch op {
+				case .roundBracketLeft:
+					node = try expression()
+					try expect(operator: .roundBracketRight)
+					break token
+				default: break
+				}
+				fallthrough
+			default:
+				throw ParserError.unexpected(token: token)
+			}
+		}
+		else {
+			throw ParserError.endOfStream
+		}
+		
+		loop: while true {
+			if let (tokenIndex, token) = iterator.next() {
+				token: switch token {
+				case .operator(let op):
+					switch op {
+					case .squareBracketLeft:
+						// an expression index (i.e. one[two])
+						node = ExpressionIndex(indexed: node, index: try expression())
+						try expect(operator: .squareBracketRight)
+					case .dot:
+						// an identifier index (i.e. one.two)
+						node = IdentifierIndex(indexed: node, index: try identifier())
+					case .colon:
+						// this is a invocation call
+						node = Invocation(callee: node, method: try identifier(), arguments: try arguments(tokenIndex))
+					case .roundBracketLeft, .curlyBracketLeft:
+						iterator.undo() // this bracket needs to be dealt with in arguments()
+						node = Call(callee: node, arguments: try arguments(tokenIndex))
+					default:
+						// there are no more tokens that add meaning to this prefix expression, return it
+						iterator.undo()
+						break loop
+					}
+				case .string(let string):
+					// a string call (i.e. print "Hello world!")
+					node = Call(callee: node, arguments: [.string(string)])
+				default:
+					// there are no more tokens that add meaning to this prefix expression, return it
+					iterator.undo()
+					break loop
+				}
+			}
+			else {
+				// TODO: this should probably just return the prefix, but what about
+				throw ParserError.endOfStream
+			}
+		}
+		
+		return Expression.prefix(node, lexer.position(of: index)!)
+	}
+	
+	mutating func arguments(_ index: String.Index) throws -> [Expression] {
+		return []
 	}
 	
 	mutating func label(_ index: String.Index) throws -> Statement {
@@ -136,8 +289,7 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func expression() throws -> Expression {
-		iterator.next()
-		return Expression.dots
+		return Expression.variable(try identifier(), lexer.position(of: iterator.index)!)
 	}
 	
 	mutating func expressionList() throws -> [Expression] {

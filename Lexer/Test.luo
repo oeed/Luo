@@ -1,1 +1,1 @@
-local name, = one
+one, two, three = one
