@@ -11,7 +11,8 @@ import Cocoa
 
 enum ParserError: Error {
 	case unexpected(token: Token)
-	case invalid(variable: Assignable)
+	case invalidVariable(variable: Assignable)
+	case invalidCall(call: Assignable)
 	case endOfStream
 }
 
@@ -111,7 +112,13 @@ struct AbstractSyntaxTree {
 	
 	func validate(variable: Assignable) throws {
 		if !(variable is ExpressionIndex || variable is IdentifierIndex || variable is Identifier) {
-			throw ParserError.invalid(variable: variable) // TODO: we probably need location information here
+			throw ParserError.invalidVariable(variable: variable) // TODO: we probably need location information here
+		}
+	}
+	
+	func validate(call: Assignable) throws {
+		if !(call is Callable) {
+			throw ParserError.invalidCall(call: call)
 		}
 	}
 	
@@ -145,7 +152,7 @@ struct AbstractSyntaxTree {
 						// get the expressions for assignment
 						var expressions = [Expression]()
 						repeat {
-							expressions.append(try expression()) // TODO: double check this index is
+							expressions.append(try expression())
 						}
 						while consume(operator: .comma)
 						
@@ -154,6 +161,10 @@ struct AbstractSyntaxTree {
 					}
 				default: break // we are a function call (or invalid)
 				}
+				
+				// should be a function call, validate first
+				try validate(call: assignable)
+				return Statement.call(assignable as! Callable, lexer.position(of: index)!)
 			}
 			else {
 				// invalid, there should be a token here

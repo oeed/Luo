@@ -14,7 +14,7 @@ enum Node {
 	case block(Block)
     case statement(Statement)
     case expression(Expression)
-    case apply(Appliable)
+    case call(Callable)
     case identifier(Identifier)
     case assignee(Assignable)
 
@@ -37,7 +37,7 @@ indirect enum Statement {
 	case label(label: Label, Position)
     case `return`([Expression], Position)
     case `break`(Position)
-    case apply(Appliable, Position)
+    case call(Callable, Position)
     
 }
 
@@ -53,7 +53,7 @@ indirect enum Expression: Assignable {
     case `operator`(NodeOperator, Expression, Expression?)
     case table([TableItem]) // table constructor
     case brackets(Expression, Position) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
-    case apply(Appliable)
+    case call(Callable)
 	case variable(Assignable, Position)
     case prefix(Assignable, Position)
 	
@@ -98,20 +98,20 @@ enum TableItem {
 
 typealias Identifier = String
 
-protocol Appliable: Assignable {
+protocol Callable: Assignable {
 
 	var callee: Assignable { get }
 	var arguments: [Expression] { get }
 
 }
-struct Call: Appliable {
+struct Call: Callable {
     
     let callee: Assignable
     let arguments: [Expression]
     
 }
 
-struct Invocation: Appliable {
+struct Invocation: Callable {
  
     let callee: Assignable
     let method: Identifier
