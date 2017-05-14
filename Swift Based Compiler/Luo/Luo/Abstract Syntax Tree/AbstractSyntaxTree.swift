@@ -11,6 +11,7 @@ import Cocoa
 
 enum ParserError: Error {
 	case unexpected(token: Token)
+	case alreadyReturned
 	case invalidVariable(variable: Assignable)
 	case invalidCall(call: Assignable)
 	case endOfStream
@@ -40,16 +41,36 @@ struct AbstractSyntaxTree {
 	
 	mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
 		var statements = [Statement]()
-		while let statement = try statement(endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
+		var hasReturned = false
+		while let statement = try statement(hasReturned: hasReturned, endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
 			statements.append(statement)
+			print(statement)
+			switch statement {
+			case .return(_, _):
+				hasReturned = true // there should either by no more statements or a delimiter after this
+			default: break
+			}
 		}
 		return statements
 	}
 	
-	mutating func statement(endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {
+	mutating func statement(hasReturned: Bool = false, endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {
 		while let (index, token) = iterator.next() {
 			token: switch token {
 			case .keyword(let keyword):
+				if hasReturned { // prevent any statements after a return, other than a delimiter
+					switch keyword {
+					case .end:
+						if !endDelimiter { fallthrough }
+					case .else, .elseif:
+						if !elseDelimiter { fallthrough }
+					case .until:
+						if !untilDelimiter { fallthrough }
+					default:
+						throw ParserError.alreadyReturned
+					}
+				}
+				
 				switch keyword {
 				case .do:
 					return Statement.do(block: try block(), lexer.position(of: index)!)
@@ -66,12 +87,12 @@ struct AbstractSyntaxTree {
 				case .goto:
 //					TODO: consider checking for Lua >= 5.2
 					return Statement.goto(label: try identifier(), lexer.position(of: index)!)
+				case .local:
+					return try local(index)
 				case .end:
 					if endDelimiter {
 						return nil
 					}
-				case .local:
-					return try local(index)
 				case .else, .elseif:
 					if elseDelimiter {
 						return nil
@@ -82,6 +103,8 @@ struct AbstractSyntaxTree {
 						return nil
 					}
 					fallthrough //throw ParserError.unexpected(token: token)
+				case .repeat:
+					return Statement.return(try expressionList(), lexer.position(of: index)!)
 				default:
 					throw ParserError.unexpected(token: token)
 				}
@@ -272,6 +295,9 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func arguments(_ index: String.Index) throws -> [Expression] {
+		iterator.skip()
+		iterator.skip()
+		iterator.skip()
 		return []
 	}
 	
@@ -311,7 +337,10 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func expression() throws -> Expression {
-		return Expression.variable(try identifier(), lexer.position(of: iterator.index)!)
+		iterator.skip()
+		iterator.skip()
+		return Expression.dots
+//		return Expression.variable(try identifier(), lexer.position(of: iterator.index)!)
 	}
 	
 	mutating func expressionList() throws -> [Expression] {

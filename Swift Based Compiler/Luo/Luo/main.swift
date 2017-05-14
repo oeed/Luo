@@ -14,7 +14,7 @@ if CommandLine.arguments.count != 2 {
 }
 
 if let lexer = Lexer(path: CommandLine.arguments[1]) {
-    try AbstractSyntaxTree(lexer: lexer)
+	try AbstractSyntaxTree(lexer: lexer)
 }
 else {
     print("Unable to open file: " + CommandLine.arguments[1])
