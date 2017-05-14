@@ -62,7 +62,6 @@ enum Keyword: String {
 	case `else` = "else"
 	case elseif = "elseif"
 	case end = "end"
-	case `false` = "false"
 	case `for` = "for"
 	case function = "function"
 	case `if` = "if"
@@ -81,6 +80,8 @@ enum Keyword: String {
 	case `is` = "is"
 	case `enum` = "enum"
 	case goto = "goto"
+	case `true` = "true"
+	case `false` = "false"
 }
 
 protocol TokenMatchable {

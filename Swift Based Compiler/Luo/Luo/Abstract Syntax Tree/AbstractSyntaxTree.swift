@@ -89,6 +89,7 @@ struct AbstractSyntaxTree {
 					return Statement.goto(label: try identifier(), lexer.position(of: index)!)
 				case .local:
 					return try local(index)
+				case .function:
 				case .end:
 					if endDelimiter {
 						return nil
@@ -331,13 +332,50 @@ struct AbstractSyntaxTree {
 		throw ParserError.endOfStream
 	}
 	
-	mutating func functionBody() throws -> Expression {
+	mutating func table() throws -> Expression {
 		iterator.next()
-		return Expression.dots
+		return Expression.varArg
 	}
 	
-	mutating func primaryExpression() -> Expression {
+	mutating func function() throws -> Expression {
+		iterator.next()
+		return Expression.varArg
+	}
 	
+	mutating func functionBody() throws -> Expression {
+		iterator.next()
+		return Expression.varArg
+	}
+	
+	mutating func primaryExpression(_ token: Token) throws -> Expression? {
+		token: switch token {
+		case .string(let string):
+			return .string(string)
+		case .number(let number):
+			return .number(number)
+		case .operator(let op):
+			switch op {
+			case .varArg:
+				return .varArg
+			case .curlyBracketLeft:
+				return try table()
+			default: break
+			}
+		case .keyword(let keyword):
+			switch keyword {
+			case .true:
+				return .bool(true)
+			case .false:
+				return .bool(false)
+			case .nil:
+				return .nil
+			case .function:
+				return try function()
+			default: break
+			}
+		default: break
+		}
+		return nil
 	}
 	
 	mutating func expression(_ minPrecedence: Int = 0) throws -> Expression {
@@ -352,15 +390,13 @@ struct AbstractSyntaxTree {
 				// if it wasn't unary try a primary expression
 				
 			}
-			
-			
 		}
 		throw ParserError.endOfStream
 	}
 	
 	mutating func expressionList() throws -> [Expression] {
 		iterator.next()
-		return [Expression.dots]
+		return [Expression.varArg]
 	}
 	
 	mutating func local(_ index: String.Index) throws -> Statement {

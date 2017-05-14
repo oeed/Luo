@@ -33,6 +33,7 @@ indirect enum Statement {
     case forIn(variables: [Identifier], iterators: [Expression], block: Block, Position)
 	case local(variables: [Identifier], values: [Expression], Position)
 	case localFunction(name: Identifier, function: Expression, Position)
+	case function(name: Identifier, function: Expression, Position)
     case goto(label: Label, Position)
 	case label(label: Label, Position)
     case `return`([Expression], Position)
@@ -44,12 +45,11 @@ indirect enum Statement {
 indirect enum Expression: Assignable {
 	
 	case `nil`
-	case dots
-	case `true`
-	case `false`
+	case varArg
+	case bool(Bool)
 	case number(Double)
 	case string(String)
-    case function([Identifier], isVarArg: Bool)
+    case function([Identifier], Block, isVarArg: Bool)
     case `operator`(NodeOperator, Expression, Expression?)
     case table([TableItem]) // table constructor
     case brackets(Expression, Position) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
