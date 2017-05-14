@@ -336,11 +336,26 @@ struct AbstractSyntaxTree {
 		return Expression.dots
 	}
 	
-	mutating func expression() throws -> Expression {
-		iterator.skip()
-		iterator.skip()
-		return Expression.dots
-//		return Expression.variable(try identifier(), lexer.position(of: iterator.index)!)
+	mutating func primaryExpression() -> Expression {
+	
+	}
+	
+	mutating func expression(_ minPrecedence: Int = 0) throws -> Expression {
+		if let (_, token) = iterator.next() {
+			var exp: Expression?
+			
+			// try unary expressions first
+			if let nodeOperator = NodeOperator.from(token: token) {
+				exp = .operator(nodeOperator, try expression(10))
+			}
+			else {
+				// if it wasn't unary try a primary expression
+				
+			}
+			
+			
+		}
+		throw ParserError.endOfStream
 	}
 	
 	mutating func expressionList() throws -> [Expression] {

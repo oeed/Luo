@@ -86,7 +86,28 @@ enum NodeOperator {
     case lessThan
     case and
     case not
-    
+	
+	static func from(token: Token) -> NodeOperator? {
+		switch token {
+		case .operator(let op):
+			switch op {
+			case .hash:
+				return .hash
+			case .minus:
+				return .minus
+			default: break
+			}
+		case .keyword(let keyword):
+			switch keyword {
+			case .not:
+				return .not
+			default: break
+			}
+		default: break
+		}
+		return nil
+	}
+	
 }
 
 enum TableItem {
