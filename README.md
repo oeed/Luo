@@ -13,3 +13,5 @@ _Is there any reason you picked Luo as opposed to something that involves Swift.
 > This language is basically designed to be used for Silica, at least that was the original intention. As such it will, for the moment, only compile to Lua. Not machine code or anything like that. But as I'm designing it as the language I want I wouldn't be surprised if I end up compiling it to something a bit more low level in the future.
 > 
 > Where Swift comes in to this is in the class system and typing. I'm essentially copying Swift's classes, enums and types as close as reasonably possible. That's also the reason I'm writing the compiler in Swift, it makes converting it to Luo later on much quicker and easier. But other than that it doesn't have anything to do with Swift.
+>
+> You are right, Luo is Lua object-oriented. I might change the name, but probably won't.
