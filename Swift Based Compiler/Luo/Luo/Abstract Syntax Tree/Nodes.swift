@@ -33,7 +33,7 @@ indirect enum Statement {
     case forIn(variables: [Identifier], iterators: [Expression], block: Block, Position)
 	case local(variables: [Identifier], values: [Expression], Position)
 	case localFunction(name: Identifier, function: Expression, Position)
-	case function(name: Identifier, function: Expression, Position)
+	case function(names: [Identifier], isMethod: Bool, function: Expression, Position)
     case goto(label: Label, Position)
 	case label(label: Label, Position)
     case `return`([Expression], Position)
