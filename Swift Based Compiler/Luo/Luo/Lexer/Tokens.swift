@@ -118,8 +118,7 @@ let tokenMatches: [TokenMatchable] = [
 	TokenMatch("\\s+"), // whitespace
 	
 	FilteredTokenMatch("0x[\\da-fA-F]+") {(_ match: String, _) -> Token? in // hex numbers
-		//		TODO: in Lua this will be done by tonumber
-		return Token.number(42)
+		return Token.number(Double(match)!)
 	},
 	
 	FilteredTokenMatch("[a-zA-Z_][\\w_]*") {(_ identifier: String, _) -> Token? in // identifiers
@@ -130,13 +129,11 @@ let tokenMatches: [TokenMatchable] = [
 	},
 	
 	FilteredTokenMatch("\\d+\\.?\\d*[eE][\\+-]?\\d+") {(_ match: String, _) -> Token? in // scientific numbers
-		//		TODO: in Lua this will be done by tonumber
-		return Token.number(42)
+		return Token.number(Double(match)!)
 	},
 	
 	FilteredTokenMatch("\\d+\\.?\\d*") {(_ match: String, _) -> Token? in // decimal numbers
-		//		TODO: in Lua this will be done by tonumber
-		return Token.number(42)
+		return Token.number(Double(match)!)
 	},
 	
 	TokenMatch("(['\"])\\1", Token.string("")), // empty string
