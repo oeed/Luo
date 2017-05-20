@@ -59,6 +59,19 @@ indirect enum Expression: Assignable {
 	
 }
 
+enum Precedence: Int {
+	case exponentUnary = 7 // exponent is technically higher, but as its right sided we subtract 1
+	case multiplicationDivision = 6
+	case additionSubtraction = 5
+	case concatenationComparison = 3 // concatention is technically higher, but as its right sided we subtract 1
+	case and = 2
+	case or = 1
+	
+	static func <=(lhs: Precedence, rhs: Precedence) -> Bool {
+		return lhs.rawValue <= rhs.rawValue
+	}
+}
+
 enum NodeOperator {
     
     case doubleEqual
@@ -85,7 +98,17 @@ enum NodeOperator {
     case greatherThan
     case lessThan
     case and
+	case or
     case not
+	
+	var isUnary: Bool {
+		switch self {
+		case .hash, .not, .minus: // minus will always be unary as this is only called on the first token of an expression
+			return true
+		default:
+			return false
+		}
+	}
 	
 	static func from(token: Token) -> NodeOperator? {
 		switch token {
@@ -95,17 +118,86 @@ enum NodeOperator {
 				return .hash
 			case .minus:
 				return .minus
+			case .notEqual:
+				return .notEqual
+			case .lessThanEqual:
+				return .lessThanEqual
+			case .greaterThanEqual:
+				return .greaterThanEqual
+			case .concatenate:
+				return .concatenate
+			case .plusPlus:
+				return .plusPlus
+			case .minusMinus:
+				return .minusMinus
+			case .plusEqual:
+				return .plusEqual
+			case .minusEqual:
+				return .minusEqual
+			case .multiplyEqual:
+				return .multiplyEqual
+			case .divideEqual:
+				return .divideEqual
+			case .modulusEqual:
+				return .modulusEqual
+			case .exponentEqual:
+				return .exponentEqual
+			case .equal:
+				return .equal
+			case .plus:
+				return .plus
+			case .multiply:
+				return .multiply
+			case .divide:
+				return .divide
+			case .modulus:
+				return .modulus
+			case .exponent:
+				return .exponent
+			case .greatherThan:
+				return .greatherThan
+			case .lessThan:
+				return .lessThan
 			default: break
 			}
 		case .keyword(let keyword):
 			switch keyword {
 			case .not:
 				return .not
+			case .and:
+				return .and
+			case .or:
+				return .or
 			default: break
 			}
 		default: break
 		}
 		return nil
+	}
+	
+	func precedence() -> Precedence? {
+		switch self {
+		case .exponent, .hash, .not:
+			return .exponentUnary // technically the same as exponent is right handed
+		case .multiply, .divide, .modulus:
+			return .multiplicationDivision
+		case .plus, .minus:
+			return .additionSubtraction
+		case .concatenate,
+			 .notEqual,
+		     .greatherThan,
+		     .greaterThanEqual,
+		     .lessThan,
+		     .lessThanEqual,
+		     .doubleEqual:
+			return .concatenationComparison // technically the same as concatenation is right handed
+		case .and:
+			return .and
+		case .or:
+			return .or
+		default:
+			return nil // TODO: precedence for customer operators.
+		}
 	}
 	
 }

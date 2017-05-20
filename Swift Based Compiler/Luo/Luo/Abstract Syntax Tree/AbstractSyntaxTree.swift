@@ -437,13 +437,12 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
-	mutating func expression(_ minPrecedence: Int = 0) throws -> Expression? {
+	mutating func expression(minPrecedence: Precedence? = nil) throws -> Expression? {
+		var exp: Expression!
 		if let (index, token) = iterator.next() {
-			var exp: Expression?
-			
 			// try unary expressions first
-			if let nodeOperator = NodeOperator.from(token: token) {
-				exp = .operator(nodeOperator, try expression(10), nil)
+			if let nodeOperator = NodeOperator.from(token: token), nodeOperator.isUnary {
+				exp = .operator(nodeOperator, try expression(minPrecedence: Precedence.multiplicationDivision), nil)
 			}
 			else {
 				// if it wasn't unary try a primary expression
@@ -453,8 +452,7 @@ struct AbstractSyntaxTree {
 					iterator.undo()
 					exp = try prefixExpression(index) // TODO: this index IS wrong
 					if exp == nil {
-						// TODO: do we actually want to throw here?
-						throw ParserError.unexpected(token: token)
+						return nil
 					}
 				}
 			}
@@ -463,18 +461,26 @@ struct AbstractSyntaxTree {
 			return nil
 		}
 		
-		// now work out precedence
-		if let (index, token) = iterator.next() { // TODO: this *might* not need .next(), but I think it does
-			// TODO: here
+		// we have the expression, now work out precedence of operators an following expressions
+		while let (index, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
+			let precedence = nodeOperator.precedence()
+			if precedence == nil || (minPrecedence != nil && precedence! <= minPrecedence!) {
+				break
+			}
+			iterator.skip()
+			
+			let subExpression: Expression = try expression(minPrecedence: precedence!)
+			exp = .operator(nodeOperator, exp, subExpression)
 		}
+		return exp
 	}
 	
-	mutating func expression(_ minPrecedence: Int = 0) throws -> Expression {
-		if let exp = try expression() as Expression? {
+	mutating func expression(minPrecedence: Precedence? = nil) throws -> Expression {
+		if let exp = try expression(minPrecedence: minPrecedence) as Expression? {
 			return exp
 		}
 		else {
-			throw ParserError.endOfStream
+			throw ParserError.expectedExpression
 		}
 	}
 	

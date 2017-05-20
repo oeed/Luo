@@ -16,7 +16,7 @@ enum Token {
 	case `operator`(Operator)
 }
 
-enum Operator {
+enum Operator { // TOD: Lua 5.3 binary operators
 	case doubleColon
 	case colon
 	case semicolon
