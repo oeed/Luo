@@ -14,7 +14,13 @@ if CommandLine.arguments.count != 2 {
 }
 
 if let lexer = Lexer(path: CommandLine.arguments[1]) {
-	try AbstractSyntaxTree(lexer: lexer)
+	do {
+		let _ = try AbstractSyntaxTree(lexer: lexer)
+	}
+	catch ParserError.unexpected(token: let token, at: let index) {
+		let position = lexer.position(of: index)
+		print("Unexpected: \(token) at line: \(position?.line) col: \(position?.column)")
+	}
 }
 else {
     print("Unable to open file: " + CommandLine.arguments[1])

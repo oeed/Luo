@@ -24,21 +24,21 @@ typealias Block = [Statement]
 typealias Label = String
 indirect enum Statement {
 	
-	case `do`(block: Block, Position)
-	case assignment(assignables: [Assignable], expressions: [Expression], Position)
-	case `while`(condition: Expression, block: Block, Position)
-	case `repeat`(block: Block, condition: Expression, Position)
-	case `if`(conditionals: [(Expression, Block)], else: Block?, Position)
-	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block, Position)
-    case forIn(variables: [Identifier], iterators: [Expression], block: Block, Position)
-	case local(variables: [Identifier], values: [Expression], Position)
-	case localFunction(name: Identifier, function: Expression, Position)
-	case function(names: [Identifier], isMethod: Bool, function: Expression, Position)
-    case goto(label: Label, Position)
-	case label(label: Label, Position)
-    case `return`([Expression], Position)
-    case `break`(Position)
-    case call(Callable, Position)
+	case `do`(block: Block, at: TokenIndex)
+	case assignment(assignables: [Assignable], expressions: [Expression], at: TokenIndex)
+	case `while`(condition: Expression, block: Block, at: TokenIndex)
+	case `repeat`(block: Block, condition: Expression, at: TokenIndex)
+	case `if`(conditionals: [(Expression, Block)], else: Block?, at: TokenIndex)
+	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block, at: TokenIndex)
+    case forIn(variables: [Identifier], iterators: [Expression], block: Block, at: TokenIndex)
+	case local(variables: [Identifier], values: [Expression], at: TokenIndex)
+	case localFunction(name: Identifier, function: Expression, at: TokenIndex)
+	case function(names: [Identifier], isMethod: Bool, function: Expression, at: TokenIndex)
+    case goto(label: Label, at: TokenIndex)
+	case label(label: Label, at: TokenIndex)
+    case `return`([Expression], at: TokenIndex)
+	case `break`(at: TokenIndex)
+    case call(Callable, at: TokenIndex)
     
 }
 
@@ -47,18 +47,18 @@ protocol FieldIndex {}
 typealias TableItem = (FieldIndex?, Expression)
 indirect enum Expression: Assignable, FieldIndex {
 	
-	case `nil`
-	case varArg
-	case bool(Bool)
-	case number(Double)
-	case string(String)
-    case function([Identifier], Block, isVarArg: Bool)
-    case `operator`(NodeOperator, Expression, Expression?)
-    case table([TableItem]) // table constructor
-    case brackets(Expression, Position) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
-    case call(Callable)
-	case variable(Assignable, Position)
-    case prefix(Assignable, Position)
+	case `nil`(at: TokenIndex)
+	case varArg(at: TokenIndex)
+	case bool(Bool, at: TokenIndex)
+	case number(Double, at: TokenIndex)
+	case string(String, at: TokenIndex)
+    case function([Identifier], Block, isVarArg: Bool, at: TokenIndex)
+    case `operator`(NodeOperator, Expression, Expression?, at: TokenIndex)
+    case table([TableItem], at: TokenIndex) // table constructor
+    case brackets(Expression, at: TokenIndex) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
+    case call(Callable, at: TokenIndex)
+	case variable(Assignable, at: TokenIndex)
+    case prefix(Assignable, at: TokenIndex)
 	
 }
 

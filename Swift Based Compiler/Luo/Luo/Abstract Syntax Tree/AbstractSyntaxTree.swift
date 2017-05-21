@@ -10,11 +10,11 @@ import Foundation
 import Cocoa
 
 enum ParserError: Error {
-	case unexpected(token: Token)
-	case alreadyReturned
-	case invalidVariable(variable: Assignable)
-	case invalidCall(call: Assignable)
-	case expectedExpression
+	case unexpected(token: Token, at: TokenIndex)
+	case alreadyReturned(at: TokenIndex)
+	case invalidVariable(variable: Assignable, at: TokenIndex)
+	case invalidCall(call: Assignable, at: TokenIndex)
+	case expectedExpression(at: TokenIndex)
 	case endOfStream
 }
 
@@ -30,14 +30,14 @@ extension Collection where Indices.Iterator.Element == Index {
 
 struct AbstractSyntaxTree {
 	
-	let tree = [Node]()
+	var tree: Block!
 	private var iterator: LexerIterator
 	private let lexer: Lexer
 	
 	init(lexer: Lexer) throws {
 		iterator = lexer.makeIterator()
 		self.lexer = lexer
-		try block()
+		self.tree = try block()
 	}
 	
 	mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
@@ -67,28 +67,28 @@ struct AbstractSyntaxTree {
 					case .until:
 						if !untilDelimiter { fallthrough }
 					default:
-						throw ParserError.alreadyReturned
+						throw ParserError.alreadyReturned(at: index)
 					}
 				}
 				
 				switch keyword {
 				case .do:
-					return Statement.do(block: try block(), lexer.position(of: index)!)
+					return Statement.do(block: try block(), at: index)
 				case .while:
-					return Statement.while(condition: try expression(), block: try block(), lexer.position(of: index)!)
+					return Statement.while(condition: try expression(), block: try block(), at: index)
 				case .repeat:
-					return Statement.repeat(block: try block(endDelimiter: false, untilDelimiter: true), condition: try expression(), lexer.position(of: index)!)
+					return Statement.repeat(block: try block(endDelimiter: false, untilDelimiter: true), condition: try expression(), at: index)
 				case .if:
-					return try ifStatement(index)
+					return try ifStatement(at: index)
 				case .for:
-					return try forStatement(index)
+					return try forStatement(at: index)
 				case .break:
-					return Statement.break(lexer.position(of: index)!)
+					return Statement.break(at: index)
 				case .goto:
 //					TODO: consider checking for Lua >= 5.2
-					return Statement.goto(label: try identifier(), lexer.position(of: index)!)
+					return Statement.goto(label: try identifier(), at: index)
 				case .local:
-					return try local(index)
+					return try local(at: index)
 				case .function:
 					// get the function name
 					var names = [Identifier]()
@@ -106,7 +106,7 @@ struct AbstractSyntaxTree {
 							break // no dot or colon, those are all the names
 						}
 					}
-					return .function(names: names, isMethod: isMethod, function: try functionBody(), lexer.position(of: index)!)
+					return .function(names: names, isMethod: isMethod, function: try functionBody(at: iterator.index), at: index)
 				case .end:
 					if endDelimiter {
 						return nil
@@ -122,67 +122,67 @@ struct AbstractSyntaxTree {
 					}
 					fallthrough //throw ParserError.unexpected(token: token)
 				case .repeat:
-					return Statement.return(try expressionList(), lexer.position(of: index)!)
+					return Statement.return(try expressionList(), at: index)
 				default:
-					throw ParserError.unexpected(token: token)
+					throw ParserError.unexpected(token: token, at: index)
 				}
 			case .operator(let op):
 				switch op {
 				case .doubleColon:
 //					TODO: consider checking for Lua >= 5.2
-					return try label(index)
+					return try label(at: index)
 				case .semicolon:
 					break
 				case .roundBracketLeft:
 					// we're part of a prefix expression
 					iterator.undo()
-					return try assignmentOrFunctionCall(index)
+					return try assignmentOrFunctionCall(at: index)
 				default:
-					throw ParserError.unexpected(token: token)
+					throw ParserError.unexpected(token: token, at: index)
 				}
 			case .identifier(_):
 				iterator.undo()
 				// we're part of a prefix expression
-				return try assignmentOrFunctionCall(index)
+				return try assignmentOrFunctionCall(at: index)
 			default:
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: index)
 			}
 		}
 		return nil
 	}
 	
-	func validate(variable: Assignable) throws {
+	func validate(variable: Assignable, at index: String.Index) throws {
 		if !(variable is ExpressionIndex || variable is IdentifierIndex || variable is Identifier) {
-			throw ParserError.invalidVariable(variable: variable) // TODO: we probably need location information here
+			throw ParserError.invalidVariable(variable: variable, at: index) // TODO: we probably need location information here
 		}
 	}
 	
-	func validate(call: Assignable) throws {
+	func validate(call: Assignable, at index: String.Index) throws {
 		if !(call is Callable) {
-			throw ParserError.invalidCall(call: call)
+			throw ParserError.invalidCall(call: call, at: index)
 		}
 	}
 	
-	mutating func assignmentOrFunctionCall(_ index: String.Index) throws -> Statement {
-		let prefix = try prefixExpression(index)
+	mutating func assignmentOrFunctionCall(at index: String.Index) throws -> Statement {
+		let prefix = try prefixExpression()
 		
 		switch prefix {
-		case .prefix(let assignable, _):
+		case .prefix(let assignable, at: let index):
 			// this could be a variable list or function call
-			if let (_, lookAheadToken) = iterator.lookAhead {
+			if let (lookAheadIndex, lookAheadToken) = iterator.lookAhead {
 				switch lookAheadToken {
 				case .operator(let op):
 					switch op {
 					case .comma, .equal:
 						// we are a variable assignment
-						try validate(variable: assignable)
+						try validate(variable: assignable, at: lookAheadIndex)
 						var assignables: [Assignable] = [assignable]
 
 						// get any subsequent variables
 						while consume(operator: .comma) {
-							switch try prefixExpression(iterator.index) {
+							switch try prefixExpression() {
 							case .prefix(let assignable, _):
-								try validate(variable: assignable)
+								try validate(variable: assignable, at: iterator.index)
 								assignables.append(assignable)
 							default: break
 							}
@@ -197,27 +197,27 @@ struct AbstractSyntaxTree {
 						}
 						while consume(operator: .comma)
 						
-						return Statement.assignment(assignables: assignables, expressions: expressions, lexer.position(of: index)!)
+						return Statement.assignment(assignables: assignables, expressions: expressions, at: index)
 					default: break // we are a function call (or invalid)
 					}
 				default: break // we are a function call (or invalid)
 				}
 				
 				// should be a function call, validate first
-				try validate(call: assignable)
-				return Statement.call(assignable as! Callable, lexer.position(of: index)!)
+				try validate(call: assignable, at: index)
+				return Statement.call(assignable as! Callable, at: index)
 			}
 			else {
 				// invalid, there should be a token here
 				throw ParserError.endOfStream
 			}
-		default:break
+		default:
+			throw ParserError.endOfStream // TODO: don't think this should ever happen, maybe handle it differently
 		}
-		throw ParserError.endOfStream // TODO: don't think this should ever happen, maybe handle it differently
 	}
 	
 	mutating func expect(operator target: Operator) throws {
-		if let (_, token) = iterator.next() {
+		if let (index, token) = iterator.next() {
 			switch token {
 			case .operator(let op):
 				switch op {
@@ -226,7 +226,7 @@ struct AbstractSyntaxTree {
 				}
 			default: break
 			}
-			throw ParserError.unexpected(token: token)
+			throw ParserError.unexpected(token: token, at: index)
 		}
 		throw ParserError.endOfStream
 	}
@@ -248,23 +248,25 @@ struct AbstractSyntaxTree {
 		return false
 	}
 
-	mutating func prefixExpression(_ index: String.Index) throws -> Expression {
+	mutating func prefixExpression() throws -> Expression {
 		var node: Assignable
-		if let (_, token) = iterator.lookAhead {
+		let expressionIndex: TokenIndex
+		if let (index, token) = iterator.lookAhead {
+			expressionIndex = index
 			token: switch token {
 			case .identifier(_):
 				node = try identifier()
 			case .operator(let op):
 				switch op {
 				case .roundBracketLeft:
-					node = Expression.brackets(try expression(), lexer.position(of: index)!)
+					node = Expression.brackets(try expression(), at: index)
 					try expect(operator: .roundBracketRight)
 					break token
 				default: break
 				}
 				fallthrough
 			default:
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: index) // TODO: in these situations does _ == index?
 			}
 		}
 		else {
@@ -285,10 +287,10 @@ struct AbstractSyntaxTree {
 						node = IdentifierIndex(indexed: node, index: try identifier())
 					case .colon:
 						// this is a invocation call
-						node = Invocation(callee: node, method: try identifier(), arguments: try arguments(tokenIndex))
+						node = Invocation(callee: node, method: try identifier(), arguments: try arguments(at: tokenIndex))
 					case .roundBracketLeft, .curlyBracketLeft:
 						iterator.undo() // this bracket needs to be dealt with in arguments()
-						node = Call(callee: node, arguments: try arguments(tokenIndex))
+						node = Call(callee: node, arguments: try arguments(at: tokenIndex))
 					default:
 						// there are no more tokens that add meaning to this prefix expression, return it
 						iterator.undo()
@@ -296,7 +298,7 @@ struct AbstractSyntaxTree {
 					}
 				case .string(let string):
 					// a string call (i.e. print "Hello world!")
-					node = Call(callee: node, arguments: [.string(string)])
+					node = Call(callee: node, arguments: [.string(string, at: tokenIndex)])
 				default:
 					// there are no more tokens that add meaning to this prefix expression, return it
 					iterator.undo()
@@ -309,10 +311,10 @@ struct AbstractSyntaxTree {
 			}
 		}
 		
-		return Expression.prefix(node, lexer.position(of: index)!)
+		return Expression.prefix(node, at: expressionIndex)
 	}
 	
-	mutating func arguments(_ index: String.Index) throws -> [Expression] {
+	mutating func arguments(at index: String.Index) throws -> [Expression] {
 		if consume(operator: .roundBracketLeft) {
 			// brackets with a list of expressions (i.e. standard calling
 			let expressions = try expressionList()
@@ -320,22 +322,22 @@ struct AbstractSyntaxTree {
 			return expressions
 		}
 		else if consume(operator: .curlyBracketLeft) {
-			return [try table()]
+			return [try table(at: index)]
 		}
-		else if let (_, token) = iterator.next() {
+		else if let (index, token) = iterator.next() {
 			switch token {
 			case .string(let string):
-				return [.string(string)]
+				return [.string(string, at: index)]
 			default: break
 			}
-			throw ParserError.unexpected(token: token)
+			throw ParserError.unexpected(token: token, at: index)
 		}
 		throw ParserError.endOfStream
 	}
 	
-	mutating func label(_ index: String.Index) throws -> Statement {
-		let label = Statement.label(label: try identifier(), lexer.position(of: index)!)
-		if let (_, token) = iterator.next() {
+	mutating func label(at index: String.Index) throws -> Statement {
+		let label = Statement.label(label: try identifier(), at: index)
+		if let (tokenIndex, token) = iterator.next() {
 			switch token {
 			case .operator(let op):
 				switch op {
@@ -345,25 +347,25 @@ struct AbstractSyntaxTree {
 				}
 				fallthrough
 			default:
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: tokenIndex)
 			}
 		}
 		throw ParserError.endOfStream
 	}
 	
 	mutating func identifier() throws -> Identifier {
-		if let (_, token) = iterator.next() {
+		if let (index, token) = iterator.next() {
 			switch token {
 			case .identifier(let identifier):
 				return identifier
 			default:
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: index)
 			}
 		}
 		throw ParserError.endOfStream
 	}
 	
-	mutating func identifier() throws -> Identifier? {
+	mutating func identifier() -> Identifier? {
 		if let (_, token) = iterator.lookAhead {
 			switch token {
 			case .identifier(let identifier):
@@ -375,7 +377,7 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
-	mutating func table() throws -> Expression {
+	mutating func table(at index: TokenIndex) throws -> Expression {
 		// this assumes the first { has already been consumed
 		var fields = [TableItem]()
 		
@@ -388,7 +390,7 @@ struct AbstractSyntaxTree {
 				try expect(operator: .squareBracketRight)
 				try expect(operator: .equal)
 			}
-			else if let ident: Identifier = try identifier() {
+			else if let ident = identifier() as Identifier? {
 				// identifier key (i.e. key = ...)
 				if consume(operator: .equal) {
 					key = ident
@@ -408,7 +410,7 @@ struct AbstractSyntaxTree {
 				}
 			}
 			else if key != nil {
-				throw ParserError.expectedExpression // as there was a key we are expecting an expression
+				throw ParserError.expectedExpression(at: iterator.index) // as there was a key we are expecting an expression
 			}
 			else {
 				// there wasn't a key or a value
@@ -416,14 +418,14 @@ struct AbstractSyntaxTree {
 			}
 		}
 		try expect(operator: .curlyBracketRight) // consume the closing bracket
-		return .table(fields)
+		return .table(fields, at: index)
 	}
 	
-	mutating func functionBody() throws -> Expression {
+	mutating func functionBody(at index: TokenIndex) throws -> Expression {
 		try expect(operator: .roundBracketLeft)
 		var wasComma = false
 		var names = [Identifier]()
-		while let name = try identifier() as Identifier? {
+		while let name = identifier() as Identifier? {
 			names.append(name)
 			wasComma = consume(operator: .comma)
 			if wasComma {
@@ -441,33 +443,33 @@ struct AbstractSyntaxTree {
 			isVarArg = consume(operator: .varArg)
 		}
 		try expect(operator: .roundBracketRight)
-		return .function(names, try block(), isVarArg: isVarArg)
+		return .function(names, try block(), isVarArg: isVarArg, at: index)
 	}
 	
-	mutating func primaryExpression(_ token: Token) throws -> Expression? {
+	mutating func primaryExpression(_ token: Token, at index: TokenIndex) throws -> Expression? {
 		token: switch token {
 		case .string(let string):
-			return .string(string)
+			return .string(string, at: index)
 		case .number(let number):
-			return .number(number)
+			return .number(number, at: index)
 		case .operator(let op):
 			switch op {
 			case .varArg: // ...
-				return .varArg
+				return .varArg(at: index)
 			case .curlyBracketLeft: // table
-				return try table()
+				return try table(at: index)
 			default: break
 			}
 		case .keyword(let keyword):
 			switch keyword {
 			case .true:
-				return .bool(true)
+				return .bool(true, at: index)
 			case .false:
-				return .bool(false)
+				return .bool(false, at: index)
 			case .nil:
-				return .nil
+				return .nil(at: index)
 			case .function:
-				return try functionBody()
+				return try functionBody(at: index)
 			default: break
 			}
 		default: break
@@ -477,18 +479,18 @@ struct AbstractSyntaxTree {
 	
 	mutating func expression(minPrecedence: Precedence? = nil) throws -> Expression? {
 		var exp: Expression!
-		if let (index, token) = iterator.next() {
+		if let (tokenIndex, token) = iterator.next() {
 			// try unary expressions first
 			if let nodeOperator = NodeOperator.from(token: token), nodeOperator.isUnary {
-				exp = .operator(nodeOperator, try expression(minPrecedence: Precedence.multiplicationDivision), nil)
+				exp = .operator(nodeOperator, try expression(minPrecedence: Precedence.multiplicationDivision), nil, at: tokenIndex)
 			}
 			else {
 				// if it wasn't unary try a primary expression
-				exp = try primaryExpression(token)
+				exp = try primaryExpression(token, at: tokenIndex)
 				if exp == nil {
 					// wasn't a primary expression, must be a prefixExpression
 					iterator.undo()
-					exp = try prefixExpression(index) // TODO: this index IS wrong
+					exp = try prefixExpression()
 					if exp == nil {
 						return nil
 					}
@@ -500,7 +502,7 @@ struct AbstractSyntaxTree {
 		}
 		
 		// we have the expression, now work out precedence of operators an following expressions
-		while let (_, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
+		while let (index, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
 			let precedence = nodeOperator.precedence()
 			if precedence == nil || (minPrecedence != nil && precedence! <= minPrecedence!) {
 				break
@@ -508,7 +510,7 @@ struct AbstractSyntaxTree {
 			iterator.skip()
 			
 			let subExpression: Expression = try expression(minPrecedence: precedence!)
-			exp = .operator(nodeOperator, exp, subExpression)
+			exp = .operator(nodeOperator, exp, subExpression, at: index)
 		}
 		return exp
 	}
@@ -518,7 +520,7 @@ struct AbstractSyntaxTree {
 			return exp
 		}
 		else {
-			throw ParserError.expectedExpression
+			throw ParserError.expectedExpression(at: iterator.index)
 		}
 	}
 	
@@ -535,17 +537,17 @@ struct AbstractSyntaxTree {
 		return expressions
 	}
 	
-	mutating func local(_ index: String.Index) throws -> Statement {
+	mutating func local(at index: String.Index) throws -> Statement {
 		// we need to determine whether this is a local function declaration or variable
 		var isFunction: Bool?
 		var variables = [Identifier]()
 		var expectComma = false
-		while let (_, token) = iterator.next() {
+		while let (tokenIndex, token) = iterator.next() {
 			token: switch token {
 			case .identifier(let identifier):
 				// local variable. there might be a comma with more variables this though
 				if isFunction != nil && isFunction! { // this local is a function, we will use this as the name
-					return .localFunction(name: identifier, function: try functionBody(), lexer.position(of: index)!)
+					return .localFunction(name: identifier, function: try functionBody(at: tokenIndex), at: index)
 				}
 				else if expectComma == false {
 					variables.append(identifier)
@@ -553,7 +555,7 @@ struct AbstractSyntaxTree {
 					isFunction = false
 					break
 				}
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: tokenIndex)
 			case .operator(let op):
 				if expectComma { // this only applies if we're not a function
 					switch op {
@@ -563,21 +565,21 @@ struct AbstractSyntaxTree {
 					case .equal:
 						let values = try expressionList()
 						if values.count == 0 {
-							throw ParserError.expectedExpression
+							throw ParserError.expectedExpression(at: iterator.index)
 						}
-						return .local(variables: variables, values: values, lexer.position(of: index)!)
+						return .local(variables: variables, values: values, at: index)
 					default:
 						// this token isn't actually part of the local declaration. we need to unconsume it
 						iterator.undo()
-						return .local(variables: variables, values: [], lexer.position(of: index)!)
+						return .local(variables: variables, values: [], at: index)
 					}
 				}
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: tokenIndex)
 			case .keyword(let keyword):
 				if expectComma {
 					// this token isn't actually part of the local declaration. we need to unconsume it
 					iterator.undo()
-					return .local(variables: variables, values: [], lexer.position(of: index)!)
+					return .local(variables: variables, values: [], at: index)
 				}
 				switch keyword {
 				case .function:
@@ -587,26 +589,26 @@ struct AbstractSyntaxTree {
 					}
 					fallthrough
 				default:
-					throw ParserError.unexpected(token: token)
+					throw ParserError.unexpected(token: token, at: tokenIndex)
 				}
 			default:
 				if expectComma {
 					// this token isn't actually part of the local declaration. we need to unconsume it
 					iterator.undo()
-					return .local(variables: variables, values: [], lexer.position(of: index)!)
+					return .local(variables: variables, values: [], at: index)
 				}
-				throw ParserError.unexpected(token: token)
+				throw ParserError.unexpected(token: token, at: tokenIndex)
 			}
 		}
 		
 		if expectComma {
 			// the declaration is actually complete, we can return
-			return .local(variables: variables, values: [], lexer.position(of: index)!)
+			return .local(variables: variables, values: [], at: index)
 		}
 		throw ParserError.endOfStream
 	}
 	
-	mutating func ifStatement(_ index: String.Index) throws -> Statement {
+	mutating func ifStatement(at index: String.Index) throws -> Statement {
 		var conditionals = [(Expression, Block)]()
 		var elseBlock: Block?
 		eachCondition: while true {
@@ -624,20 +626,20 @@ struct AbstractSyntaxTree {
 			default: break
 			}
 		}
-		return Statement.if(conditionals: conditionals, else: elseBlock, lexer.position(of: index)!)
+		return Statement.if(conditionals: conditionals, else: elseBlock, at: index)
 	}
 	
-	mutating func forStatement(_ index: String.Index) throws -> Statement {
+	mutating func forStatement(at index: String.Index) throws -> Statement {
 		// at this stage we've no idea whether the for loop is a 'for a in b` or `for i = a, b`
 		var variables = [Identifier]()
 		var isNumerical: Bool?
 		var expectComma = false
 		variables: while true {
-			if let token = iterator.next() {
-				token: switch token.1 {
+			if let (index, token) = iterator.next() {
+				token: switch token {
 				case .identifier(let identifier):
 					if isNumerical != nil, isNumerical! {
-						throw ParserError.unexpected(token: token.1)
+						throw ParserError.unexpected(token: token, at: index)
 					} // numerical loops shouldn't have more than one variable
 					variables.append(identifier)
 					expectComma = true
@@ -659,7 +661,7 @@ struct AbstractSyntaxTree {
 					break // this equal shouldn't be here
 					default: break
 					}
-					throw ParserError.unexpected(token: token.1)
+					throw ParserError.unexpected(token: token, at: index)
 				case .keyword(let keyword):
 					switch keyword {
 					case .in:
@@ -672,7 +674,7 @@ struct AbstractSyntaxTree {
 					}
 					fallthrough
 				default:
-					throw ParserError.unexpected(token: token.1)
+					throw ParserError.unexpected(token: token, at: index)
 				}
 			}
 			else {
@@ -685,39 +687,39 @@ struct AbstractSyntaxTree {
 		var iterators = [Expression]()
 		iterators: while true {
 			iterators.append(try expression())
-			if let token = iterator.next() {
-				token: switch token.1 {
+			if let (index, token) = iterator.next() {
+				token: switch token {
 				case .operator(let op):
 					switch op {
 					case .comma:
 						if isNumerical! && iterators.count >= 3 {
-							throw ParserError.unexpected(token: token.1) // we already have three expressions, we can't have a fourth. error
+							throw ParserError.unexpected(token: token, at: index) // we already have three expressions, we can't have a fourth. error
 						}
 						continue
 					default:
-						throw ParserError.unexpected(token: token.1)
+						throw ParserError.unexpected(token: token, at: index)
 					}
 				case .keyword(let keyword):
 					switch keyword {
 					case .do:
 						if isNumerical! && iterators.count < 2 {
-							throw ParserError.unexpected(token: token.1) // we don't have at least two expressions. error.
+							throw ParserError.unexpected(token: token, at: index) // we don't have at least two expressions. error.
 						}
 						break iterators // we have reached the `do`, get out and read the block
 					default:
-						throw ParserError.unexpected(token: token.1)
+						throw ParserError.unexpected(token: token, at: index)
 					}
 				default:
-					throw ParserError.unexpected(token: token.1)
+					throw ParserError.unexpected(token: token, at: index)
 				}
 			}
 		}
 		
 		if isNumerical! {
-			return Statement.forNumerical(variable: variables[0], start: iterators[0], stop: iterators[1], increment: iterators[safe: 2], block: try block(), lexer.position(of: index)!)
+			return Statement.forNumerical(variable: variables[0], start: iterators[0], stop: iterators[1], increment: iterators[safe: 2], block: try block(), at: index)
 		}
 		else {
-			return Statement.forIn(variables: variables, iterators: iterators, block: try block(), lexer.position(of: index)!)
+			return Statement.forIn(variables: variables, iterators: iterators, block: try block(), at: index)
 		}
 	}
 	

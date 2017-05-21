@@ -8,6 +8,7 @@
 
 import Foundation
 
+typealias TokenIndex = String.Index
 struct Position {
 	
 	let line: Int
@@ -27,13 +28,13 @@ struct LexerIterator: IteratorProtocol {
 	
 	let lexer: Lexer
 	
-	var index: String.Index // TODO: is index even needed? doesn't lastToken suffice?
-	private var history: [(String.Index, Token)]
+	var index: TokenIndex // TODO: is index even needed? doesn't lastToken suffice?
+	private var history: [(TokenIndex, Token)]
 	
 	var lineIndex: Int = 1
-	var lastToken: (String.Index, Token)?
+	var lastToken: (TokenIndex, Token)?
 	
-	var lookAhead: (String.Index, Token)? {
+	var lookAhead: (TokenIndex, Token)? {
 		do {
 			var token: Token?
 			var position = index
@@ -60,7 +61,7 @@ struct LexerIterator: IteratorProtocol {
 		history = []
 	}
 	
-	mutating func next() -> (String.Index, Token)? {
+	mutating func next() -> (TokenIndex, Token)? {
 		if lastToken != nil {
 			history.append(lastToken!)
 		}
@@ -121,7 +122,7 @@ struct Lexer: Sequence {
 		}
 	}
 	
-	func position(of index: String.Index) -> Position? {
+	func position(of index: TokenIndex) -> Position? {
 		for (line, range) in lineRanges.enumerated() {
 			if range ~= index {
                 return Position(line: line + 1, column: source.distance(from: range.lowerBound, to: index), lexer: self)
@@ -130,7 +131,7 @@ struct Lexer: Sequence {
 		return nil
 	}
 	
-	func token(at index: inout String.Index) throws -> Token? {
+	func token(at index: inout TokenIndex) throws -> Token? {
 		if index == source.endIndex {
 			throw LexerError.endOfFile
 		}
