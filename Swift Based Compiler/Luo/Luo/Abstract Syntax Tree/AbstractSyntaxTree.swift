@@ -381,11 +381,6 @@ struct AbstractSyntaxTree {
 		return Expression.varArg
 	}
 	
-	mutating func function() throws -> Expression {
-		iterator.next()
-		return Expression.varArg
-	}
-	
 	mutating func functionBody() throws -> Expression {
 		try expect(operator: .roundBracketLeft)
 		var wasComma = false
@@ -429,7 +424,7 @@ struct AbstractSyntaxTree {
 			case .nil:
 				return .nil
 			case .function:
-				return try function()
+				return try functionBody()
 			default: break
 			}
 		default: break
