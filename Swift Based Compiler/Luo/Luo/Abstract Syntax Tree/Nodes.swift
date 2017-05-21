@@ -42,7 +42,10 @@ indirect enum Statement {
     
 }
 
-indirect enum Expression: Assignable {
+protocol FieldIndex {}
+
+typealias TableItem = (FieldIndex?, Expression)
+indirect enum Expression: Assignable, FieldIndex {
 	
 	case `nil`
 	case varArg
@@ -202,13 +205,6 @@ enum NodeOperator {
 	
 }
 
-enum TableItem {
-    
-    case array(value: Expression) // an array item, added like { a, b }
-    case dictionary(key: Expression, value: Expression) // a dictionary item, added like { [a] = b }
-    
-}
-
 typealias Identifier = String
 
 protocol Callable: Assignable {
@@ -233,7 +229,7 @@ struct Invocation: Callable {
 }
 
 protocol Assignable {}
-extension Identifier: Assignable {}
+extension Identifier: Assignable, FieldIndex {}
 struct ExpressionIndex: Assignable {
 	
 	let indexed: Assignable

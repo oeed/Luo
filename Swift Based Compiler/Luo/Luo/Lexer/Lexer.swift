@@ -27,8 +27,8 @@ struct LexerIterator: IteratorProtocol {
 	
 	let lexer: Lexer
 	
-	var index: String.Index
-	private var previousIndex: String.Index?
+	var index: String.Index // TODO: is index even needed? doesn't lastToken suffice?
+	private var history: [(String.Index, Token)]
 	
 	var lineIndex: Int = 1
 	var lastToken: (String.Index, Token)?
@@ -57,12 +57,12 @@ struct LexerIterator: IteratorProtocol {
 	init(_ lexer: Lexer) {
 		self.lexer = lexer
 		index = lexer.source.startIndex
-		previousIndex = index
+		history = []
 	}
 	
 	mutating func next() -> (String.Index, Token)? {
 		if lastToken != nil {
-			previousIndex = lastToken!.0
+			history.append(lastToken!)
 		}
 		lastToken = lookAhead
 		if lastToken != nil {
@@ -76,8 +76,12 @@ struct LexerIterator: IteratorProtocol {
 	}
 	
 	mutating func undo() {
-		if previousIndex != nil {
-			index = previousIndex!
+		if let previous = history.popLast() {
+			index = previous.0
+			lastToken = previous
+		}
+		else {
+			index = lexer.source.startIndex
 		}
 	}
 	

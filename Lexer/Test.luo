@@ -1,1 +1,4 @@
-value = 1 + 2 + 3
+value = {
+	one, two,
+	[three] = 3
+}

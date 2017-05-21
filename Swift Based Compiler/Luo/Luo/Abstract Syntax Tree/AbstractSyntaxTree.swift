@@ -45,7 +45,6 @@ struct AbstractSyntaxTree {
 		var hasReturned = false
 		while let statement = try statement(hasReturned: hasReturned, endDelimiter: endDelimiter, elseDelimiter: elseDelimiter, untilDelimiter: untilDelimiter) {
 			statements.append(statement)
-			print(statement)
 			switch statement {
 			case .return(_, _):
 				hasReturned = true // there should either by no more statements or a delimiter after this
@@ -378,7 +377,46 @@ struct AbstractSyntaxTree {
 	
 	mutating func table() throws -> Expression {
 		// this assumes the first { has already been consumed
-		return Expression.varArg
+		var fields = [TableItem]()
+		
+		while true {
+			var key: FieldIndex?
+			
+			if consume(operator: .squareBracketLeft) {
+				// expression key (i.e. [key] = ...)
+				key = try expression() as Expression
+				try expect(operator: .squareBracketRight)
+				try expect(operator: .equal)
+			}
+			else if let ident: Identifier = try identifier() {
+				// identifier key (i.e. key = ...)
+				if consume(operator: .equal) {
+					key = ident
+				}
+				else {
+					// as there is not an equals operator this is not the key, just the value
+					iterator.undo()
+				}
+			}
+			
+			// now get the value. if we have a key we are expecting an expression, otherwise we just break the loop
+			if let value = try expression() as Expression? {
+				fields.append((key, value))
+				if !consume(operator: .comma) {
+					// if there wasn't a trailing comma break
+					break
+				}
+			}
+			else if key != nil {
+				throw ParserError.expectedExpression // as there was a key we are expecting an expression
+			}
+			else {
+				// there wasn't a key or a value
+				break
+			}
+		}
+		try expect(operator: .curlyBracketRight) // consume the closing bracket
+		return .table(fields)
 	}
 	
 	mutating func functionBody() throws -> Expression {
