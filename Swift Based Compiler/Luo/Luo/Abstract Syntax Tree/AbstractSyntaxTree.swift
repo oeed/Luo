@@ -394,8 +394,13 @@ struct AbstractSyntaxTree {
 		}
 		
 		var isVarArg = false
-		if wasComma || names.count == 0 {
-			isVarArg = try consume(operator: .varArg)
+		if wasComma {
+			// it there's a trailing comma but no identifier then ... MUST be next
+			isVarArg = true
+			try expect(operator: .varArg)
+		}
+		else if names.count == 0 {
+			isVarArg = consume(operator: .varArg)
 		}
 		try expect(operator: .roundBracketRight)
 		return .function(names, try block(), isVarArg: isVarArg)
