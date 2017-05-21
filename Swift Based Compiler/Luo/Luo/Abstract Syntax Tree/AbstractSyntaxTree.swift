@@ -462,7 +462,7 @@ struct AbstractSyntaxTree {
 		}
 		
 		// we have the expression, now work out precedence of operators an following expressions
-		while let (index, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
+		while let (_, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
 			let precedence = nodeOperator.precedence()
 			if precedence == nil || (minPrecedence != nil && precedence! <= minPrecedence!) {
 				break
