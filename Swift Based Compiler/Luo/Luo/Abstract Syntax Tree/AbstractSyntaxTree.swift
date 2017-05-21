@@ -216,6 +216,21 @@ struct AbstractSyntaxTree {
 		}
 	}
 	
+	mutating func expect(keyword target: Keyword) throws {
+		if let (index, token) = iterator.next() {
+			switch token {
+			case .keyword(let keyword):
+				switch keyword {
+				case target: return
+				default: break
+				}
+			default: break
+			}
+			throw ParserError.unexpected(token: token, at: index)
+		}
+		throw ParserError.endOfStream
+	}
+	
 	mutating func expect(operator target: Operator) throws {
 		if let (index, token) = iterator.next() {
 			switch token {
@@ -609,10 +624,13 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func ifStatement(at index: String.Index) throws -> Statement {
+		// 'if' has already been consumed
 		var conditionals = [(Expression, Block)]()
 		var elseBlock: Block?
 		eachCondition: while true {
-			conditionals.append((try expression(), try block(elseDelimiter: true)))
+			let exp: Expression = try expression()
+			try expect(keyword: .then)
+			conditionals.append((exp, try block(elseDelimiter: true)))
 			//	we need to check whether the ending keyword of the block was else or end, elseif will just loop again
 			switch iterator.lastToken!.1 {
 			case .keyword(let keyword):
@@ -621,7 +639,7 @@ struct AbstractSyntaxTree {
 					elseBlock = try block()
 				case .end:
 					break eachCondition
-				default: break
+				default: break // elseif is the only other possible keyword here as block only stops on the delimiters we want
 				}
 			default: break
 			}
