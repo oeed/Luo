@@ -278,6 +278,7 @@ struct AbstractSyntaxTree {
 			case .operator(let op):
 				switch op {
 				case .roundBracketLeft:
+					iterator.skip() // jump over the bracket we just consumed
 					node = Expression.brackets(try expression(), at: index)
 					try expect(operator: .roundBracketRight)
 					break token
