@@ -202,15 +202,11 @@ struct AbstractSyntaxTree {
 					}
 				default: break // we are a function call (or invalid)
 				}
-				
-				// should be a function call, validate first
-				try validate(call: assignable, at: index)
-				return Statement.call(assignable as! Callable, at: index)
 			}
-			else {
-				// invalid, there should be a token here
-				throw ParserError.endOfStream
-			}
+			
+			// should be a function call, validate first
+			try validate(call: assignable, at: index)
+			return Statement.call(assignable as! Callable, at: index)
 		default:
 			throw ParserError.endOfStream // TODO: don't think this should ever happen, maybe handle it differently
 		}
@@ -336,13 +332,8 @@ struct AbstractSyntaxTree {
 				}
 			}
 			else {
-				// TODO: should this just return the prefix?
-                if optional {
-                    return nil
-                }
-                else {
-                    throw ParserError.endOfStream
-                }
+				// we're at the end of the file, just return the expression
+				break
 			}
 		}
 		
