@@ -666,6 +666,7 @@ struct AbstractSyntaxTree {
 				switch keyword {
 				case .else:
 					elseBlock = try block()
+					break eachCondition // there shouldn't be any more conditions after this (end has been consumed by block())
 				case .end:
 					break eachCondition
 				default: break // elseif is the only other possible keyword here as block only stops on the delimiters we want
