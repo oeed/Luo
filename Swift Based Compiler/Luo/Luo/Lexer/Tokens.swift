@@ -146,11 +146,11 @@ let tokenMatches: [TokenMatchable] = [
 		return Token.string(match)
 	},
 	
-	TokenMatch("--\\[(=*)\\[.*?\\]\\1\\]"), // multi-line comment
+	TokenMatch("--\\[(=*)\\[[\\S\\s]*?\\]\\1\\]"), // multi-line comment
 	
 	TokenMatch("--.*?(?:\\n|$)"), // single line comment
 	
-	FilteredTokenMatch("\\[(=*)\\[.*?\\]\\1\\]") {(_ match: String, _ commentLevel: String) -> Token? in // multi-line string
+	FilteredTokenMatch("\\[(=*)\\[[\\S\\s]*?\\]\\1\\]") {(_ match: String, _ commentLevel: String) -> Token? in // multi-line string
 		return Token.string(match)
 	},
 	
