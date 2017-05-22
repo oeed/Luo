@@ -142,7 +142,7 @@ let tokenMatches: [TokenMatchable] = [
 		return Token.string(match.substring(to: match.index(before: match.endIndex)))
 	},
 	
-	FilteredTokenMatch("(['\"]).*?(\\\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
+	FilteredTokenMatch("(['\"]).*?[^\\\\](\\\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
 		return Token.string(match)
 	},
 	
