@@ -462,7 +462,7 @@ struct AbstractSyntaxTree {
 		while let name = identifier() as Identifier? {
 			names.append(name)
 			wasComma = consume(operator: .comma)
-			if wasComma {
+			if !wasComma {
 				break
 			}
 		}
