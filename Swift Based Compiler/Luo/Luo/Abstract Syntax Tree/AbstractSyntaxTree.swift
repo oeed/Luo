@@ -121,7 +121,7 @@ struct AbstractSyntaxTree {
 						return nil
 					}
 					fallthrough //throw ParserError.unexpected(token: token)
-				case .repeat:
+				case .return:
 					return Statement.return(try expressionList(), at: index)
 				default:
 					throw ParserError.unexpected(token: token, at: index)
@@ -263,7 +263,11 @@ struct AbstractSyntaxTree {
 		return false
 	}
 
-	mutating func prefixExpression() throws -> Expression {
+    mutating func prefixExpression() throws -> Expression {
+        return try prefixExpression(optional: false)!
+    }
+    
+    mutating func prefixExpression(optional: Bool = true) throws -> Expression? {
 		var node: Assignable
 		let expressionIndex: TokenIndex
 		if let (index, token) = iterator.lookAhead {
@@ -281,11 +285,21 @@ struct AbstractSyntaxTree {
 				}
 				fallthrough
 			default:
-				throw ParserError.unexpected(token: token, at: index) // TODO: in these situations does _ == index?
+                if optional {
+                    return nil
+                }
+                else {
+                    throw ParserError.unexpected(token: token, at: index) // TODO: in these situations does _ == index?
+                }
 			}
 		}
 		else {
-			throw ParserError.endOfStream
+            if optional {
+                return nil
+            }
+            else {
+                throw ParserError.endOfStream
+            }
 		}
 		
 		loop: while true {
@@ -321,12 +335,17 @@ struct AbstractSyntaxTree {
 				}
 			}
 			else {
-				// TODO: this should probably just return the prefix, but what about
-				throw ParserError.endOfStream
+				// TODO: should this just return the prefix?
+                if optional {
+                    return nil
+                }
+                else {
+                    throw ParserError.endOfStream
+                }
 			}
 		}
 		
-		return Expression.prefix(node, at: expressionIndex)
+        return Expression.prefix(node, at: expressionIndex)
 	}
 	
 	mutating func arguments(at index: String.Index) throws -> [Expression] {
@@ -505,8 +524,10 @@ struct AbstractSyntaxTree {
 				if exp == nil {
 					// wasn't a primary expression, must be a prefixExpression
 					iterator.undo()
-					exp = try prefixExpression()
-					if exp == nil {
+					if let prefix = try prefixExpression() as Expression? {
+                        exp = prefix
+                    }
+                    else {
 						return nil
 					}
 				}
@@ -540,6 +561,7 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func expressionList() throws -> [Expression] {
+		// this can return zero expressions, so a check may be neccesary on return
 		var expressions = [Expression]()
 		while true {
 			if let exp = try expression() as Expression? {
@@ -548,6 +570,13 @@ struct AbstractSyntaxTree {
 					break // no trailing comma, the list has ended
 				}
 			}
+            else if expressions.count == 0 {
+                break // there weren't any expressions
+            }
+            else {
+                // there was a comma before this, but no expression when there should've been
+                throw ParserError.expectedExpression(at: iterator.index)
+            }
 		}
 		return expressions
 	}
