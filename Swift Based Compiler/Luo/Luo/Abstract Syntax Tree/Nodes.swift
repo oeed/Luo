@@ -121,6 +121,8 @@ enum NodeOperator {
 				return .hash
 			case .minus:
 				return .minus
+			case .doubleEqual:
+				return .doubleEqual
 			case .notEqual:
 				return .notEqual
 			case .lessThanEqual:
