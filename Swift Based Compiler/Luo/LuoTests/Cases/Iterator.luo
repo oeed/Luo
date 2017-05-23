@@ -1,0 +1,9 @@
+one = 1
+two, three = 2, 3
+
+if one then
+	print(two)
+	print "three"
+else
+	print "three"
+end
