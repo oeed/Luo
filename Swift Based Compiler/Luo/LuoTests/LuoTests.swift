@@ -55,6 +55,8 @@ class LuoTests: XCTestCase {
         var iterator = lexer.makeIterator()
         XCTAssertEqual(iterator.next()!.1, Token.identifier("one"))
         XCTAssertEqual(iterator.next()!.1, Token.operator(.equal))
+        iterator.undo()
+        XCTAssertEqual(iterator.next()!.1, Token.operator(.equal))
         XCTAssertEqual(iterator.next()!.1, Token.number(1))
         XCTAssertEqual(iterator.lastToken!.1, Token.number(1), "Lookbehind")
         XCTAssertEqual(iterator.lookAhead!.1, Token.identifier("two"), "Lookahead")
