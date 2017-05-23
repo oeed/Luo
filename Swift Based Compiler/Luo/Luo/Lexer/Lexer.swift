@@ -8,7 +8,8 @@
 
 import Foundation
 
-typealias TokenIndex = String.Index
+typealias TokenIndex = Int
+typealias SourceIndex = String.Index
 struct Position {
 	
 	let line: Int
@@ -26,64 +27,42 @@ enum LexerError: Error {
 
 struct LexerIterator: IteratorProtocol {
 	
-	let lexer: Lexer
+	let tokens: [Token]
+    var nextIndex: TokenIndex
+    var lastToken: (TokenIndex, Token)?
 	
-	var index: TokenIndex // TODO: is index even needed? doesn't lastToken suffice?
-	private var history: [(TokenIndex, Token)]
+    var lookAhead: (TokenIndex, Token)? {
+        return self[nextIndex]
+    }
+    
+    let lexer: Lexer
+    
+    subscript (_ index: TokenIndex) -> (TokenIndex, Token)? {
+        if let token = tokens[safe: index] {
+            return (index, token)
+        }
+        return nil
+    }
+    
 	
-	var lineIndex: Int = 1
-	var lastToken: (TokenIndex, Token)?
-	
-	var lookAhead: (TokenIndex, Token)? {
-		do {
-			var token: Token?
-			var position = index
-			repeat {
-				token = try lexer.token(at: &position)
-			}
-			while token == nil
-			return (position, token!)
-		}
-		catch LexerError.unexpectedCharacter(let position) {
-			print("Unknown character at: \(position.line), \(position.column)")
-			return nil
-		}
-		catch LexerError.endOfFile {}
-		catch {
-			print("Uncaught error.")
-		}
-		return nil
-	}
-	
-	init(_ lexer: Lexer) {
-		self.lexer = lexer
-		index = lexer.source.startIndex
-		history = []
-	}
+    init(_ tokens: [Token], lexer: Lexer) {
+		self.tokens = tokens
+		nextIndex = tokens.startIndex
+        self.lexer = lexer
+    }
 	
 	mutating func next() -> (TokenIndex, Token)? {
-		if lastToken != nil {
-			history.append(lastToken!)
-		}
-		lastToken = lookAhead
-		if lastToken != nil {
-			index = lastToken!.0
-		}
+        lastToken = self[nextIndex]
+        nextIndex = tokens.index(after: nextIndex)
 		return lastToken
 	}
 	
 	mutating func skip() {
-		let _ = next()
+		nextIndex = tokens.index(after: nextIndex)
 	}
 	
 	mutating func undo() {
-		if let previous = history.popLast() {
-			index = previous.0
-			lastToken = previous
-		}
-		else {
-			index = lexer.source.startIndex
-		}
+        nextIndex = tokens.index(before: nextIndex)
 	}
 	
 }
@@ -93,8 +72,20 @@ struct Lexer: Sequence {
 	let source: String
 	
 	private let lineRanges: [ClosedRange<String.Index>]
+    
+    let tokens: [Token]
+    private let indicies: [SourceIndex]
+    
+    init?(path: String) throws {
+        if let source = try? String(contentsOfFile: path) {
+            try self.init(source: source)
+        }
+        else {
+            return nil
+        }
+    }
 	
-	init(source: String) {
+	init(source: String) throws {
 		self.source = source
 		
 		var startIndex = source.startIndex
@@ -107,47 +98,54 @@ struct Lexer: Sequence {
 			}
 		}
 		self.lineRanges = lineRanges
-	}
+        
+        var theTokens = [Token]()
+        var theIndicies = [SourceIndex]()
+        var index = source.startIndex
+        index: while index < source.endIndex {
+            for tokenMatch in tokenMatches {
+                if let range = source.range(of: "^" + tokenMatch.pattern, options: .regularExpression, range: index ..< source.endIndex, locale: nil) {
+                    // the is our next match
+                    index = range.upperBound // source.index(range.upperBound, offsetBy: 1, limitedBy: source.endIndex) ?? source.endIndex
+                    if tokenMatch is FilteredTokenMatch {
+                        theTokens.append((tokenMatch as! FilteredTokenMatch).filter(source.substring(with: range), ""))
+                        theIndicies.append(range.lowerBound)
+                    }
+                    else if let token = (tokenMatch as! TokenMatch).token {
+                        theTokens.append(token)
+                        theIndicies.append(range.lowerBound)
+                    }
+                    continue index
+                }
+            }
+            tokens = theTokens // these two are here only to shut up a 'self not initialised' error
+            indicies = theIndicies
+            throw LexerError.unexpectedCharacter(position(of: index)!)
+        }
+        tokens = theTokens
+        indicies = theIndicies
+    }
+    
 	
 	func makeIterator() -> LexerIterator {
-		return LexerIterator(self)
+        return LexerIterator(tokens, lexer: self)
 	}
-	
-	init?(path: String) {
-		if let source = try? String(contentsOfFile: path) {
-			self.init(source: source)
-		}
-		else {
-			return nil
-		}
-	}
-	
-	func position(of index: TokenIndex) -> Position? {
+    
+	func position(of index: SourceIndex) -> Position? {
 		for (line, range) in lineRanges.enumerated() {
 			if range ~= index {
                 return Position(line: line + 1, column: source.distance(from: range.lowerBound, to: index), lexer: self)
 			}
 		}
 		return nil
-	}
-	
-	func token(at index: inout TokenIndex) throws -> Token? {
-		if index == source.endIndex {
-			throw LexerError.endOfFile
-		}
-		for tokenMatch in tokenMatches {
-			if let range = source.range(of: "^" + tokenMatch.pattern, options: .regularExpression, range: index ..< source.endIndex, locale: nil) {
-				// the is our next match
-				index = range.upperBound // source.index(range.upperBound, offsetBy: 1, limitedBy: source.endIndex) ?? source.endIndex
-				if tokenMatch is FilteredTokenMatch {
-					return (tokenMatch as! FilteredTokenMatch).filter(source.substring(with: range), "")
-				}
-				else {
-					return (tokenMatch as! TokenMatch).token
-				}
-			}
-		}
-		throw LexerError.unexpectedCharacter(position(of: index)!)
-	}
-	
+    }
+    
+    func position(of index: TokenIndex) -> Position? {
+        let sourceIndex = indicies[safe: index]
+        if sourceIndex != nil {
+            return position(of: sourceIndex!)
+        }
+        return nil
+    }
+
 }

@@ -13,7 +13,7 @@ if CommandLine.arguments.count != 2 {
     print("Expects 1 argument: luo <path>")
 }
 
-if let lexer = Lexer(path: CommandLine.arguments[1]) {
+if let lexer = try Lexer(path: CommandLine.arguments[1]) {
 	do {
 		let _ = try AbstractSyntaxTree(lexer: lexer)
     }

@@ -93,9 +93,9 @@ protocol TokenMatchable {
 struct FilteredTokenMatch: TokenMatchable {
 	
 	let pattern: String
-	let filter: (String, String) -> Token?
+	let filter: (String, String) -> Token
 	
-	init(_ pattern: String, _ filter: @escaping (String, String) -> Token?) {
+	init(_ pattern: String, _ filter: @escaping (String, String) -> Token) {
 		self.pattern = pattern
 		self.filter = filter
 	}
@@ -117,32 +117,32 @@ struct TokenMatch: TokenMatchable {
 let tokenMatches: [TokenMatchable] = [
 	TokenMatch("\\s+"), // whitespace
 	
-	FilteredTokenMatch("0x[\\da-fA-F]+") {(_ match: String, _) -> Token? in // hex numbers
+	FilteredTokenMatch("0x[\\da-fA-F]+") {(_ match: String, _) -> Token in // hex numbers
 		return Token.number(Double(match)!)
 	},
 	
-	FilteredTokenMatch("[a-zA-Z_][\\w_]*") {(_ identifier: String, _) -> Token? in // identifiers
+	FilteredTokenMatch("[a-zA-Z_][\\w_]*") {(_ identifier: String, _) -> Token in // identifiers
 		if let keyword = Keyword(rawValue: identifier) {
 			return Token.keyword(keyword)
 		}
 		return Token.identifier(identifier)
 	},
 	
-	FilteredTokenMatch("\\d+\\.?\\d*[eE][\\+-]?\\d+") {(_ match: String, _) -> Token? in // scientific numbers
+	FilteredTokenMatch("\\d+\\.?\\d*[eE][\\+-]?\\d+") {(_ match: String, _) -> Token in // scientific numbers
 		return Token.number(Double(match)!)
 	},
 	
-	FilteredTokenMatch("\\d+\\.?\\d*") {(_ match: String, _) -> Token? in // decimal numbers
+	FilteredTokenMatch("\\d+\\.?\\d*") {(_ match: String, _) -> Token in // decimal numbers
 		return Token.number(Double(match)!)
 	},
 	
 	TokenMatch("(['\"])\\1", Token.string("")), // empty string
 	
-	FilteredTokenMatch("(['\"]).*?[^\\\\](\\*)\\2\\1") {(_ match: String, _) -> Token? in // string
+	FilteredTokenMatch("(['\"]).*?[^\\\\](\\*)\\2\\1") {(_ match: String, _) -> Token in // string
 		return Token.string(match.substring(to: match.index(before: match.endIndex)))
 	},
 	
-	FilteredTokenMatch("(['\"]).*?[^\\\\](\\\\*)\\2\\1") {(_ match: String, _) -> Token? in // string with escapes
+	FilteredTokenMatch("(['\"]).*?[^\\\\](\\\\*)\\2\\1") {(_ match: String, _) -> Token in // string with escapes
 		return Token.string(match)
 	},
 	
@@ -150,7 +150,7 @@ let tokenMatches: [TokenMatchable] = [
 	
 	TokenMatch("--.*?(?:\\n|$)"), // single line comment
 	
-	FilteredTokenMatch("\\[(=*)\\[[\\S\\s]*?\\]\\1\\]") {(_ match: String, _ commentLevel: String) -> Token? in // multi-line string
+	FilteredTokenMatch("\\[(=*)\\[[\\S\\s]*?\\]\\1\\]") {(_ match: String, _ commentLevel: String) -> Token in // multi-line string
 		return Token.string(match)
 	},
 	

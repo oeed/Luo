@@ -106,7 +106,7 @@ struct AbstractSyntaxTree {
 							break // no dot or colon, those are all the names
 						}
 					}
-					return .function(names: names, isMethod: isMethod, function: try functionBody(at: iterator.index), at: index)
+					return .function(names: names, isMethod: isMethod, function: try functionBody(at: iterator.nextIndex), at: index) // TODO: these references to iterator.nextIndex might be incorrect
 				case .end:
 					if endDelimiter {
 						return nil
@@ -151,19 +151,19 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
-	func validate(variable: Assignable, at index: String.Index) throws {
+	func validate(variable: Assignable, at index: TokenIndex) throws {
 		if !(variable is ExpressionIndex || variable is IdentifierIndex || variable is Identifier) {
 			throw ParserError.invalidVariable(variable: variable, at: index) // TODO: we probably need location information here
 		}
 	}
 	
-	func validate(call: Assignable, at index: String.Index) throws {
+	func validate(call: Assignable, at index: TokenIndex) throws {
 		if !(call is Callable) {
 			throw ParserError.invalidCall(call: call, at: index)
 		}
 	}
 	
-	mutating func assignmentOrFunctionCall(at index: String.Index) throws -> Statement {
+	mutating func assignmentOrFunctionCall(at index: TokenIndex) throws -> Statement {
 		let prefix = try prefixExpression()
 		
 		switch prefix {
@@ -182,7 +182,7 @@ struct AbstractSyntaxTree {
 						while consume(operator: .comma) {
 							switch try prefixExpression() {
 							case .prefix(let assignable, _):
-								try validate(variable: assignable, at: iterator.index)
+								try validate(variable: assignable, at: iterator.nextIndex) // TODO: these references to iterator.nextIndex might be incorrect
 								assignables.append(assignable)
 							default: break
 							}
@@ -340,7 +340,7 @@ struct AbstractSyntaxTree {
         return Expression.prefix(node, at: expressionIndex)
 	}
 	
-	mutating func arguments(at index: String.Index) throws -> [Expression] {
+	mutating func arguments(at index: TokenIndex) throws -> [Expression] {
 		if consume(operator: .roundBracketLeft) {
 			// brackets with a list of expressions (i.e. standard calling
 			let expressions = try expressionList()
@@ -361,7 +361,7 @@ struct AbstractSyntaxTree {
 		throw ParserError.endOfStream
 	}
 	
-	mutating func label(at index: String.Index) throws -> Statement {
+	mutating func label(at index: TokenIndex) throws -> Statement {
 		let label = Statement.label(label: try identifier(), at: index)
 		if let (tokenIndex, token) = iterator.next() {
 			switch token {
@@ -436,7 +436,7 @@ struct AbstractSyntaxTree {
 				}
 			}
 			else if key != nil {
-				throw ParserError.expectedExpression(at: iterator.index) // as there was a key we are expecting an expression
+				throw ParserError.expectedExpression(at: iterator.nextIndex) // as there was a key we are expecting an expression   // TODO: these references to iterator.nextIndex might be incorrect
 			}
 			else {
 				// there wasn't a key or a value
@@ -548,7 +548,7 @@ struct AbstractSyntaxTree {
 			return exp
 		}
 		else {
-			throw ParserError.expectedExpression(at: iterator.index)
+			throw ParserError.expectedExpression(at: iterator.nextIndex) // TODO: these references to iterator.nextIndex might be incorrect
 		}
 	}
 	
@@ -567,13 +567,13 @@ struct AbstractSyntaxTree {
             }
             else {
                 // there was a comma before this, but no expression when there should've been
-                throw ParserError.expectedExpression(at: iterator.index)
+                throw ParserError.expectedExpression(at: iterator.nextIndex) // TODO: these references to iterator.nextIndex might be incorrect
             }
 		}
 		return expressions
 	}
 	
-	mutating func local(at index: String.Index) throws -> Statement {
+	mutating func local(at index: TokenIndex) throws -> Statement {
 		// we need to determine whether this is a local function declaration or variable
 		var isFunction: Bool?
 		var variables = [Identifier]()
@@ -601,7 +601,7 @@ struct AbstractSyntaxTree {
 					case .equal:
 						let values = try expressionList()
 						if values.count == 0 {
-							throw ParserError.expectedExpression(at: iterator.index)
+							throw ParserError.expectedExpression(at: iterator.nextIndex) // TODO: these references to iterator.nextIndex might be incorrect
 						}
 						return .local(variables: variables, values: values, at: index)
 					default:
@@ -644,7 +644,7 @@ struct AbstractSyntaxTree {
 		throw ParserError.endOfStream
 	}
 	
-	mutating func ifStatement(at index: String.Index) throws -> Statement {
+	mutating func ifStatement(at index: TokenIndex) throws -> Statement {
 		// 'if' has already been consumed
 		var conditionals = [(Expression, Block)]()
 		var elseBlock: Block?
@@ -669,7 +669,7 @@ struct AbstractSyntaxTree {
 		return Statement.if(conditionals: conditionals, else: elseBlock, at: index)
 	}
 	
-	mutating func forStatement(at index: String.Index) throws -> Statement {
+	mutating func forStatement(at index: TokenIndex) throws -> Statement {
 		// at this stage we've no idea whether the for loop is a 'for a in b` or `for i = a, b`
 		var variables = [Identifier]()
 		var isNumerical: Bool?
