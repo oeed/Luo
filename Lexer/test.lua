@@ -76,7 +76,7 @@ function serialise( t, tTracking, sIndent )
     end
 end
 
-local h = io.open("Example.luo", "r")
+local h = io.open("Test.luo", "r")
 local line = h:read()
 local str = ""
 while line do
@@ -84,5 +84,9 @@ while line do
 	line = h:read()
 end
 
+local i = 0
+local start = os.clock()
 for k,v in ipairs(lexer.lex(str)) do
+    i = i + 1
 end
+print(os.clock() - start)

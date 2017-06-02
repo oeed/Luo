@@ -32,7 +32,7 @@ struct AbstractSyntaxTree {
 	
 	var tree: Block!
 	private var iterator: LexerIterator
-	private let lexer: Lexer
+	let lexer: Lexer
 	
 	init(lexer: Lexer) throws {
 		iterator = lexer.makeIterator()

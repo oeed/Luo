@@ -63,18 +63,18 @@ class LuoTests: XCTestCase {
         
     }
     
-//    func testLexerIterationPerformance() {
-//        // This is an example of a performance test case.
-//		
-//        self.measure {
-//            do {
-//                try Lexer(path: "/Users/olivercooper/Dropbox/Documents/Projects/Luo/Lexer/Test.luo")
-//            }
-//            catch {}
-//        }
-//		
-//    }
-//	
+    func testLexerIterationPerformance() {
+        // This is an example of a performance test case.
+		
+        self.measure {
+            do {
+                try Lexer(path: "/Users/olivercooper/Dropbox/Documents/Projects/Luo/Lexer/Test.luo")
+            }
+            catch {}
+        }
+		
+    }
+//
 //	func testAstBuildingPerformance() {
 //        do{
 //        self.lexer = try Lexer(path: "/Users/olivercooper/Dropbox/Documents/Projects/Luo/Lexer/Test.luo")!
