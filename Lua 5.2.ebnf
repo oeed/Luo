@@ -1,6 +1,12 @@
-Chunk ::= Block
+Chunk ::= (TopStatement)*
 
 Block ::= (Statement)* (LastStatement)?
+
+TopStatement ::=
+  Class |
+  Protocol |
+  Enum |
+  Statement
 
 Statement ::=  ";" |
   VariableList "=" ExpressionList |
@@ -26,15 +32,23 @@ LastStatement ::= "return" (ExpressionList)?
 
 Label ::= "::" Name "::"
 
+Type ::= (Name ("." Name)? | "[" Type "]" | "[" Type ":" Type "]") ("?")?
+
 FunctionName ::= Name ("." Name)* (":" Name)?
 
-VariableList ::= Variable ("," Variable)*
+VariableList ::= VariableDeclaration ("," VariableDeclaration)*
+
+VariableDeclaration ::=  TypedName |
+  PrefixExpression "[" Expression "]" |
+  PrefixExpression "." Name
 
 Variable ::=  Name |
   PrefixExpression "[" Expression "]" |
   PrefixExpression "." Name
 
-NameList ::= Name ("," Name)*
+TypedName ::= Name (":" Type)?
+
+NameList ::= TypedName ("," TypedName)*
 
 ExpressionList ::= Expression (Expression ",")*
 
@@ -42,23 +56,55 @@ Expression ::=  "nil" | "false" | "true" |
   Number | String | "..." | Function |
   PrefixExpression | TableConstructor |
   Expression BinaryOperator Expression |
-  UnaryOperator Expression
+  PreUnaryOperator Expression |
+  Expression PostUnaryOperator |
+  Expression "is" Type
 
 PrefixExpression ::= Variable |
   FunctionCall |
   "(" Expression ")"
 
-FunctionCall ::= PrefixExpression args |
+FunctionCall ::= PrefixExpression Arguments |
   PrefixExpression ":" Name Arguments
 
-Arguments ::=  "(" (ExpressionList)? ")" |
+Argument ::= (Name ":")? Expression
+
+ArgumentList ::= Argument ("," Argument)*
+
+Arguments ::=  "(" (ArgumentList)? ")" |
   TableConstructor | String
 
 Function ::= "function" FunctionBody
 
-FunctionBody ::= "(" (ParameterList)? ")" Block "end"
+ReturnType ::= ":" Type ("," Type)*
 
-ParameterList ::= NameList ("," "...")? | "..."
+Parameter ::= (Name)? TypedName ("=" Expression)?
+
+ParameterList ::= Parameter ("," Parameter)* ("," "...")? | "..."
+
+FunctionBody ::= "(" (ParameterList)? ")" (ReturnType)? Block "end"
+
+Class ::= "class" Name (":" Name ("," Name)*)? ClassBody
+
+ClassBody ::= (Property | Default | Function)* "end"
+
+Property ::= "property" TypedName ("=" Expression)?
+
+Default ::= "default" Name "=" Expression
+
+Enum ::= "enum" EnumBody
+
+EnumItem ::= Name ("(" (Name ":")? Type ")")? ("=" Expression)?
+
+EnumBody ::= EnumItem ("," EnumItem)* "end"
+
+Protocol ::= "protocol" Name (":" Name ("," Name)*)? ProtocolBody
+
+ProtocolProperty ::= "property" TypedName
+
+ProtocolFunction ::= "function" "(" (ParameterList)? ")" (ReturnType)?
+
+ProtocolBody ::= (ProtocolProperty | ProtocolFunction)* "end"
 
 TableConstructor ::= "{" (FieldList)? "}"
 
@@ -69,10 +115,13 @@ Field ::= "[" Expression "]" "=" Expression |
 
 FieldSeparator ::= "," | ";"
 
-BinaryOperator ::= "+" | "-" | "*" | "/" |
+BinaryOperator ::= "+=" | "-=" | "*=" | "/=" | "%=" |
+  "+" | "-" | "*" | "/" | 
   "^" | "%" | ".." |
   "<" | "<=" | ">" | ">=" |
   "==" | "~=" |
   "and" | "or"
 
-UnaryOperator ::= "-" | "not" | "#"
+PreUnaryOperator ::= "-" | "not" | "#"
+
+PostUnaryOperator ::= "++" | "--"
