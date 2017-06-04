@@ -119,7 +119,7 @@ struct AbstractSyntaxTree {
 	}
 	
 	// for situations like (Name ":")? Type, we check if there's a : and return the name if so
-	mutating func optionalName() -> Identifier? {
+	mutating func optionalName() throws -> Identifier? {
 		// check if the token after the next token is :, if so we expect a name
 		let name: Identifier?
 		if let (_, token) = iterator.doubleLookAhead {
@@ -146,7 +146,7 @@ struct AbstractSyntaxTree {
 			var associatedTypes = [AssociatedType]()
 			if consume(operator: .roundBracketLeft) {
 				repeat {
-					associatedTypes.append(AssociatedType(name: optionalName(), type: try type()))
+					associatedTypes.append(AssociatedType(name: try optionalName(), type: try type()))
 				} while consume(operator: .comma)
 				try expect(operator: .roundBracketRight)
 			}
@@ -483,7 +483,7 @@ struct AbstractSyntaxTree {
 			// brackets with a list of expressions (i.e. standard calling
 			var arguments = [Argument]()
 			repeat {
-				arguments.append(Argument(name: optionalName(), value: try expression()))
+				arguments.append(Argument(name: try optionalName(), value: try expression()))
 			} while consume(operator: .comma)
 			
 			try expect(operator: .roundBracketRight)
@@ -629,8 +629,20 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func parameter() throws -> Parameter? {
-		let name = optionalName()
-		let variable = try typedIdentifier()
+		var name: Identifier? = try identifier() as Identifier
+		let otherName = try optionalName() // TODO: this won't work
+		var variable: TypedIdentifier
+		var theType: Type?
+		if consume(operator: .colon) {
+			theType = try type()
+		}
+		if otherName != nil {
+			variable = TypedIdentifier(identifier: otherName!, type: theType)
+		}
+		else {
+			variable = TypedIdentifier(identifier: name!, type: theType)
+			name = nil
+		}
 		var defaultValue: Expression?
 		if consume(operator: .equal) {
 			defaultValue = try expression() as Expression
