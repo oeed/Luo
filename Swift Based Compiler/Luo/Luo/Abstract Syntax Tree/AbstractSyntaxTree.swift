@@ -98,7 +98,7 @@ struct AbstractSyntaxTree {
 					if consume(operator: .equal) {
 						defaultValue = try expression() as Expression
 					}
-					body.append(.property(name: name, `default`: defaultValue, at: index))
+					body.append(.property(name: name, default: defaultValue, at: index))
 				case .default:
 					let name: Identifier = try identifier()
 					try expect(operator: .equal)
