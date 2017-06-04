@@ -8,16 +8,68 @@
 
 import Foundation
 
+typealias Chunk = [TopStatement]
 
-enum Node {
+enum TopStatement {
 	
-	case block(Block)
-    case statement(Statement)
-    case expression(Expression)
-    case call(Callable)
-    case identifier(Identifier)
-    case assignee(Assignable)
+	case `class`(class: Class, at: TokenIndex)
+	case `protocol`(protocol: Protocol, at: TokenIndex)
+	case `enum`(enum: Enum, at: TokenIndex)
+	case statement(statement: Statement, at: TokenIndex)
+	
+}
 
+struct Class {
+	
+	let name: Identifier
+	let conforms: [Identifier]
+	let body: [ClassStatement]
+	
+}
+
+enum ClassStatement {
+	
+	case property(name: TypedIdentifier, default: Expression?, at: TokenIndex)
+	case `default`(name: Identifier, value: Expression?, at: TokenIndex)
+	case function(name: Identifier, function: Expression, at: TokenIndex)
+	
+}
+
+struct Protocol {
+	
+	let name: Identifier
+	let conforms: [Identifier]
+	let body: [ProtocolStatement]
+	
+}
+
+enum ProtocolStatement {
+	
+	case property(name: TypedIdentifier, at: TokenIndex)
+	case function(name: Identifier, parameters: [Parameter], returns: [Type], isVarArg: Bool, at: TokenIndex)
+	
+}
+
+struct Enum {
+	
+	let name: Identifier
+	let cases: [EnumCase]
+	
+}
+
+struct EnumCase {
+	
+	let name: Identifier
+	let associatedTypes: [AssociatedType]
+	let value: Expression?
+	
+}
+	
+struct AssociatedType {
+
+	let name: Identifier?
+	let type: Type
+	
 }
 
 typealias Block = [Statement]
@@ -25,13 +77,13 @@ typealias Label = String
 indirect enum Statement {
 	
 	case `do`(block: Block, at: TokenIndex)
-	case assignment(assignables: [Assignable], expressions: [Expression], at: TokenIndex)
+	case assignment(assignables: [VariableAssignment], expressions: [Expression], at: TokenIndex)
 	case `while`(condition: Expression, block: Block, at: TokenIndex)
 	case `repeat`(block: Block, condition: Expression, at: TokenIndex)
 	case `if`(conditionals: [(Expression, Block)], else: Block?, at: TokenIndex)
 	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block, at: TokenIndex)
-    case forIn(variables: [Identifier], iterators: [Expression], block: Block, at: TokenIndex)
-	case local(variables: [Identifier], values: [Expression], at: TokenIndex)
+    case forIn(variables: [TypedIdentifier], iterators: [Expression], block: Block, at: TokenIndex)
+	case local(variables: [TypedIdentifier], values: [Expression], at: TokenIndex)
 	case localFunction(name: Identifier, function: Expression, at: TokenIndex)
 	case function(names: [Identifier], isMethod: Bool, function: Expression, at: TokenIndex)
     case goto(label: Label, at: TokenIndex)
@@ -42,33 +94,55 @@ indirect enum Statement {
     
 }
 
+indirect enum Type {
+	
+	case optional(Type)
+	case array(value: Type, at: TokenIndex)
+	case dictionary(key: Type, value: Type, at: TokenIndex)
+	case name(name: Identifier)
+	case index(parent: Identifier, name: Identifier)
+	
+}
+
 protocol FieldIndex {}
+extension Identifier: FieldIndex {}
 
 typealias TableItem = (FieldIndex?, Expression)
-indirect enum Expression: Assignable, FieldIndex {
+indirect enum Expression: PrefixExpression, FieldIndex {
 	
 	case `nil`(at: TokenIndex)
 	case varArg(at: TokenIndex)
 	case bool(Bool, at: TokenIndex)
 	case number(Double, at: TokenIndex)
 	case string(String, at: TokenIndex)
-    case function([Identifier], Block, isVarArg: Bool, at: TokenIndex)
+	case function([Parameter], returns: [Type], body: Block, isVarArg: Bool, at: TokenIndex)
     case `operator`(NodeOperator, Expression, Expression?, at: TokenIndex)
     case table([TableItem], at: TokenIndex) // table constructor
     case brackets(Expression, at: TokenIndex) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
     case call(Callable, at: TokenIndex)
-	case variable(Assignable, at: TokenIndex)
-    case prefix(Assignable, at: TokenIndex)
+	case variable(PrefixExpression, at: TokenIndex)
+    case prefix(PrefixExpression, at: TokenIndex)
+	case `is`(Expression, type: Type, at: TokenIndex)
+	
+}
+
+struct Parameter {
+	
+	let name: Identifier? // the externally accessible name
+	let variable: TypedIdentifier // the type and internal name
+	let `default`: Expression?
 	
 }
 
 enum Precedence: Int {
+	case postfix = 8 // ++ & --
 	case exponentUnary = 7 // exponent is technically higher, but as its right sided we subtract 1
 	case multiplicationDivision = 6
 	case additionSubtraction = 5
 	case concatenationComparison = 3 // concatention is technically higher, but as its right sided we subtract 1
 	case and = 2
 	case or = 1
+	case mutation = 0
 	
 	static func <=(lhs: Precedence, rhs: Precedence) -> Bool {
 		return lhs.rawValue <= rhs.rawValue
@@ -90,7 +164,6 @@ enum NodeOperator {
     case divideEqual
     case modulusEqual
     case exponentEqual
-    case equal
     case plus
     case multiply
     case minus
@@ -147,8 +220,6 @@ enum NodeOperator {
 				return .modulusEqual
 			case .exponentEqual:
 				return .exponentEqual
-			case .equal:
-				return .equal
 			case .plus:
 				return .plus
 			case .multiply:
@@ -182,6 +253,8 @@ enum NodeOperator {
 	
 	func precedence() -> Precedence? {
 		switch self {
+		case .minusMinus, .plusPlus:
+			return .postfix
 		case .exponent, .hash, .not:
 			return .exponentUnary // technically the same as exponent is right handed
 		case .multiply, .divide, .modulus:
@@ -200,48 +273,58 @@ enum NodeOperator {
 			return .and
 		case .or:
 			return .or
-		default:
-			return nil // TODO: precedence for customer operators.
+		case .plusEqual, .minusEqual, .multiplyEqual, .divideEqual, .modulusEqual, .exponentEqual:
+			return .mutation
 		}
 	}
 	
 }
 
+protocol PrefixExpression {}
+
 typealias Identifier = String
+extension Identifier: PrefixExpression {}
 
-protocol Callable: Assignable {
+protocol Callable: PrefixExpression {
 
-	var callee: Assignable { get }
+	var callee: PrefixExpression { get }
 	var arguments: [Expression] { get }
 
 }
 struct Call: Callable {
     
-    let callee: Assignable
+    let callee: PrefixExpression
     let arguments: [Expression]
     
 }
 
 struct Invocation: Callable {
  
-    let callee: Assignable
+    let callee: PrefixExpression
     let method: Identifier
     let arguments: [Expression]
     
 }
 
-protocol Assignable {}
-extension Identifier: Assignable, FieldIndex {}
-struct ExpressionIndex: Assignable {
+protocol VariableAssignment {}
+
+struct TypedIdentifier: VariableAssignment {
 	
-	let indexed: Assignable
+	let type: Type?
+	let identifier: Identifier
+	
+}
+
+struct ExpressionIndex: PrefixExpression, VariableAssignment {
+	
+	let indexed: PrefixExpression
 	let index: Expression
 	
 }
 
-struct IdentifierIndex: Assignable {
+struct IdentifierIndex: PrefixExpression, VariableAssignment {
 	
-	let indexed: Assignable
+	let indexed: PrefixExpression
 	let index: Identifier
 	
 }
