@@ -124,6 +124,33 @@ struct AbstractSyntaxTree {
 	
 	mutating func `protocol`() throws -> Protocol {
 		try expect(keyword: .protocol)
+		let name: Identifier = try identifier()
+		var conforms = [Identifier]()
+		if consume(operator: .colon) {
+			repeat {
+				conforms.append(try identifier())
+			} while consume(operator: .comma)
+		}
+		var body = [ProtocolStatement]()
+		token: while let (index, token) = iterator.lookAhead {
+			switch token {
+			case .keyword(let keyword):
+				switch keyword {
+				case .property:
+					body.append(.property(name: try typedIdentifier(), at: index))
+				case .function:
+					let head = try functionHead()
+					body.append(.function(name: name, parameters: head.parameters, returns: head.returns, isVarArg: head.isVarArg, at: index))
+				case .end:
+					break token
+				default:
+					throw ParserError.unexpected(token: token, at: index)
+				}
+			default:
+				throw ParserError.unexpected(token: token, at: index)
+			}
+		}
+		return Protocol(name: name, conforms: conforms, body: body)
 	}
 	
 	mutating func statement(hasReturned: Bool = false, endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {
