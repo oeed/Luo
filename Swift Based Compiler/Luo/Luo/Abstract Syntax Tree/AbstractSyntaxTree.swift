@@ -528,12 +528,12 @@ struct AbstractSyntaxTree {
 		return .table(fields, at: index)
 	}
 	
-	mutating func functionBody(at index: TokenIndex) throws -> Expression {
+	mutating func functionHead() throws -> (parameters: [Parameter], returns: [Type], isVarArg: Bool) {
 		try expect(operator: .roundBracketLeft)
 		var wasComma = false
-		var names = [Identifier]()
-		while let name = identifier() as Identifier? {
-			names.append(name)
+		var parameters = [Parameter]()
+		while let parameter = parameter() as Parameter? {
+			parameters.append(parameter)
 			wasComma = consume(operator: .comma)
 			if !wasComma {
 				break
@@ -546,11 +546,24 @@ struct AbstractSyntaxTree {
 			isVarArg = true
 			try expect(operator: .varArg)
 		}
-		else if names.count == 0 {
+		else if parameters.count == 0 {
 			isVarArg = consume(operator: .varArg)
 		}
 		try expect(operator: .roundBracketRight)
-		return .function(names, try block(), isVarArg: isVarArg, at: index)
+		
+		var returns = [Type]()
+		if consume(operator: .colon) {
+			repeat {
+				returns.append(try type())
+			} while try !consume(operator: .comma)
+		}
+		
+		return (parameters: parameters, returns: returns, isVarArg: isVarArg)
+	}
+	
+	mutating func functionBody(at index: TokenIndex) throws -> Expression {
+		let head = try functionHead()
+		return .function(parameters: head.parameters, returns: head.returns, isVarArg: head.isVarArg, try block(), at: index)
 	}
 	
 	mutating func primaryExpression(_ token: Token, at index: TokenIndex) throws -> Expression? {

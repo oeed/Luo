@@ -30,7 +30,7 @@ struct Class {
 enum ClassStatement {
 	
 	case property(name: TypedIdentifier, default: Expression?, at: TokenIndex)
-	case `default`(name: Identifier, value: Expression?, at: TokenIndex)
+	case `default`(name: Identifier, value: Expression, at: TokenIndex)
 	case function(name: Identifier, function: Expression, at: TokenIndex)
 	
 }
@@ -115,7 +115,7 @@ indirect enum Expression: PrefixExpression, FieldIndex {
 	case bool(Bool, at: TokenIndex)
 	case number(Double, at: TokenIndex)
 	case string(String, at: TokenIndex)
-	case function([Parameter], returns: [Type], body: Block, isVarArg: Bool, at: TokenIndex)
+	case function([Parameter], returns: [Type], isVarArg: Bool, body: Block, at: TokenIndex)
     case `operator`(NodeOperator, Expression, Expression?, at: TokenIndex)
     case table([TableItem], at: TokenIndex) // table constructor
     case brackets(Expression, at: TokenIndex) // i.e. print((unpack {1, 2, 3})) only prints one, wrapping brackets only gives the first return value
@@ -310,8 +310,8 @@ protocol VariableAssignment {}
 
 struct TypedIdentifier: VariableAssignment {
 	
-	let type: Type?
 	let identifier: Identifier
+	let type: Type?
 	
 }
 
