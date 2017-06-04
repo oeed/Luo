@@ -783,16 +783,22 @@ struct AbstractSyntaxTree {
 			return nil
 		}
 		
-		// we have the expression, now work out precedence of operators an following expressions
-		while let (index, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
-			let precedence = nodeOperator.precedence()
-			if precedence == nil || (minPrecedence != nil && precedence! <= minPrecedence!) {
-				break
+		// see if the 'is' keyword follows this expression
+		if consume(keyword: .is) {
+			exp = .is(exp, type: try type(), at: iterator.nextIndex.advanced(by: -1))
+		}
+		else {
+			// we have the expression, now work out precedence of operators an following expressions
+			while let (index, token) = iterator.lookAhead, let nodeOperator = NodeOperator.from(token: token) {
+				let precedence = nodeOperator.precedence()
+				if precedence == nil || (minPrecedence != nil && precedence! <= minPrecedence!) {
+					break
+				}
+				iterator.skip()
+				
+				let subExpression: Expression = try expression(minPrecedence: precedence!)
+				exp = .operator(nodeOperator, exp, subExpression, at: index)
 			}
-			iterator.skip()
-			
-			let subExpression: Expression = try expression(minPrecedence: precedence!)
-			exp = .operator(nodeOperator, exp, subExpression, at: index)
 		}
 		return exp
 	}
