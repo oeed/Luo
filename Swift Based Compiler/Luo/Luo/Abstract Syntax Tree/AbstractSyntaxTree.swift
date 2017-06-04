@@ -628,15 +628,21 @@ struct AbstractSyntaxTree {
 		return .table(fields, at: index)
 	}
 	
-	mutating func parameter() -> Parameter? {
-		// TODO:
+	mutating func parameter() throws -> Parameter? {
+		let name = optionalName()
+		let variable = try typedIdentifier()
+		var defaultValue: Expression?
+		if consume(operator: .equal) {
+			defaultValue = try expression() as Expression
+		}
+		return Parameter(name: name, variable: variable, default: defaultValue)
 	}
 	
 	mutating func functionHead() throws -> (parameters: [Parameter], returns: [Type], isVarArg: Bool) {
 		try expect(operator: .roundBracketLeft)
 		var wasComma = false
 		var parameters = [Parameter]()
-		while let parameter = parameter() as Parameter? {
+		while let parameter = try parameter() as Parameter? {
 			parameters.append(parameter)
 			wasComma = consume(operator: .comma)
 			if !wasComma {
