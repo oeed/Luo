@@ -36,9 +36,9 @@ Type ::= (Name ("." Name)? | "[" Type "]" | "[" Type ":" Type "]") ("?")?
 
 FunctionName ::= Name ("." Name)* (":" Name)?
 
-VariableList ::= VariableDeclaration ("," VariableDeclaration)*
+VariableList ::= VariableAssignment ("," VariableAssignment)*
 
-VariableDeclaration ::=  TypedName |
+VariableAssignment ::=  TypedName |
   PrefixExpression "[" Expression "]" |
   PrefixExpression "." Name
 
@@ -94,9 +94,9 @@ Default ::= "default" Name "=" Expression
 
 Enum ::= "enum" EnumBody
 
-EnumItem ::= Name ("(" (Name ":")? Type ")")? ("=" Expression)?
+EnumCase ::= Name ("(" (Name ":")? Type ")")? ("=" Expression)?
 
-EnumBody ::= EnumItem ("," EnumItem)* "end"
+EnumBody ::= EnumCase ("," EnumCase)* "end"
 
 Protocol ::= "protocol" Name (":" Name ("," Name)*)? ProtocolBody
 
