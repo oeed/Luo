@@ -143,6 +143,9 @@ struct AbstractSyntaxTree {
 		let name: Identifier = try identifier()
 		var cases = [EnumCase]()
 		repeat {
+			if consume(keyword: .end) {
+				return Enum(name: name, cases: cases)
+			}
 			let caseName: Identifier = try identifier()
 			var value: Expression?
 			var associatedTypes = [AssociatedType]()
@@ -158,6 +161,8 @@ struct AbstractSyntaxTree {
 			}
 			cases.append(EnumCase(name: caseName, associatedTypes: associatedTypes, value: value))
 		} while consume(operator: .comma)
+		
+		try expect(keyword: .end)
 		
 		return Enum(name: name, cases: cases)
 	}
@@ -377,6 +382,23 @@ struct AbstractSyntaxTree {
 			throw ParserError.unexpected(token: token, at: index)
 		}
 		throw ParserError.endOfStream
+	}
+	
+	mutating func consume(keyword target: Keyword) -> Bool {
+		if let (_, token) = iterator.lookAhead {
+			switch token {
+			case .keyword(let op):
+				switch op {
+				case target:
+					// found what we're looking for, jump over it
+					iterator.skip()
+					return true
+				default: break
+				}
+			default: break
+			}
+		}
+		return false
 	}
 	
 	mutating func consume(operator target: Operator) -> Bool {
