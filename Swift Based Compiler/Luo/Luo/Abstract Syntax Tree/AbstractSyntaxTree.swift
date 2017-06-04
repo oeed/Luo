@@ -105,7 +105,7 @@ struct AbstractSyntaxTree {
 					let value: Expression = try expression()
 					body.append(.default(name: name, value: value, at: index))
 				case .function:
-					body.append(.protocol(try `protocol`(), at: index))
+					body.append(try functionBody(at: index))
 				case .end:
 					break token
 				default:
@@ -475,6 +475,10 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
+	mutating func type() throws -> Type {
+		// TODO:
+	}
+	
 	mutating func typedIdentifier() throws -> TypedIdentifier {
 		let theIdentifier: Identifier = try identifier()
 		var theType: Type?
@@ -528,6 +532,10 @@ struct AbstractSyntaxTree {
 		return .table(fields, at: index)
 	}
 	
+	mutating func parameter() -> Parameter? {
+		// TODO:
+	}
+	
 	mutating func functionHead() throws -> (parameters: [Parameter], returns: [Type], isVarArg: Bool) {
 		try expect(operator: .roundBracketLeft)
 		var wasComma = false
@@ -563,7 +571,7 @@ struct AbstractSyntaxTree {
 	
 	mutating func functionBody(at index: TokenIndex) throws -> Expression {
 		let head = try functionHead()
-		return .function(parameters: head.parameters, returns: head.returns, isVarArg: head.isVarArg, try block(), at: index)
+		return .function(head.parameters, returns: head.returns, isVarArg: head.isVarArg, body: try block(), at: index)
 	}
 	
 	mutating func primaryExpression(_ token: Token, at index: TokenIndex) throws -> Expression? {
