@@ -300,6 +300,7 @@ struct AbstractSyntaxTree {
 		}
 	}
 	
+	// TODO: VariableAssignment
 	mutating func assignmentOrFunctionCall(at index: TokenIndex) throws -> Statement {
 		let prefix = try prefixExpression()
 		
@@ -477,20 +478,24 @@ struct AbstractSyntaxTree {
         return Expression.prefix(node, at: expressionIndex)
 	}
 	
-	mutating func arguments(at index: TokenIndex) throws -> [Expression] {
+	mutating func arguments(at index: TokenIndex) throws -> [Argument] {
 		if consume(operator: .roundBracketLeft) {
 			// brackets with a list of expressions (i.e. standard calling
-			let expressions = try expressionList()
+			var arguments = [Argument]()
+			repeat {
+				arguments.append(Argument(name: optionalName(), value: try expression()))
+			} while consume(operator: .comma)
+			
 			try expect(operator: .roundBracketRight)
-			return expressions
+			return arguments
 		}
 		else if consume(operator: .curlyBracketLeft) {
-			return [try table(at: index)]
+			return [Argument(name: nil, value: try table(at: index))]
 		}
 		else if let (index, token) = iterator.next() {
 			switch token {
 			case .string(let string):
-				return [.string(string, at: index)]
+				return [Argument(name: nil, value: .string(string, at: index))]
 			default: break
 			}
 			throw ParserError.unexpected(token: token, at: index)
@@ -628,7 +633,7 @@ struct AbstractSyntaxTree {
 		if consume(operator: .colon) {
 			repeat {
 				returns.append(try type())
-			} while !consume(operator: .comma)
+			} while consume(operator: .comma)
 		}
 		
 		return (parameters: parameters, returns: returns, isVarArg: isVarArg)

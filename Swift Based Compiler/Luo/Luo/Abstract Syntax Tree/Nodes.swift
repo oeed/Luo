@@ -288,13 +288,21 @@ extension Identifier: PrefixExpression {}
 protocol Callable: PrefixExpression {
 
 	var callee: PrefixExpression { get }
-	var arguments: [Expression] { get }
+	var arguments: [Argument] { get }
 
 }
+
+struct Argument {
+	
+	let name: Identifier?
+	let value: Expression
+	
+}
+
 struct Call: Callable {
     
     let callee: PrefixExpression
-    let arguments: [Expression]
+    let arguments: [Argument]
     
 }
 
@@ -302,7 +310,7 @@ struct Invocation: Callable {
  
     let callee: PrefixExpression
     let method: Identifier
-    let arguments: [Expression]
+    let arguments: [Argument]
     
 }
 
