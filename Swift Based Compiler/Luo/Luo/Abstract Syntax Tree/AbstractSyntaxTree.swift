@@ -80,6 +80,42 @@ struct AbstractSyntaxTree {
 	
 	mutating func `class`() throws -> Class {
 		try expect(keyword: .class)
+		let name: Identifier = try identifier()
+		var conforms = [Identifier]()
+		if consume(operator: .colon) {
+			repeat {
+				conforms.append(try identifier())
+			} while consume(operator: .comma)
+		}
+		var body = [ClassStatement]()
+		token: while let (index, token) = iterator.lookAhead {
+			switch token {
+			case .keyword(let keyword):
+				switch keyword {
+				case .property:
+					let name = try typedIdentifier()
+					var defaultValue: Expression?
+					if consume(operator: .equal) {
+						defaultValue = try expression() as Expression
+					}
+					body.append(.property(name: name, `default`: defaultValue, at: index))
+				case .default:
+					let name: Identifier = try identifier()
+					try expect(operator: .equal)
+					let value: Expression = try expression()
+					body.append(.default(name: name, value: value, at: index))
+				case .function:
+					body.append(.protocol(try `protocol`(), at: index))
+				case .end:
+					break token
+				default:
+					fallthrough
+				}
+			default:
+				throw ParserError.unexpected(token: token, at: index)
+			}
+		}
+
 	}
 	
 	mutating func `enum`() throws -> Enum {
