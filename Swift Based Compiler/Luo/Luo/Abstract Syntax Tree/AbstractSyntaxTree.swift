@@ -475,6 +475,15 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
+	mutating func typedIdentifier() throws -> TypedIdentifier {
+		let theIdentifier: Identifier = try identifier()
+		var theType: Type?
+		if consume(operator: .colon) {
+			theType = try type()
+		}
+		return TypedIdentifier(identifier: theIdentifier, type: theType)
+	}
+	
 	mutating func table(at index: TokenIndex) throws -> Expression {
 		// this assumes the first { has already been consumed
 		var fields = [TableItem]()
