@@ -88,7 +88,7 @@ struct AbstractSyntaxTree {
 			} while consume(operator: .comma)
 		}
 		var body = [ClassStatement]()
-		token: while let (index, token) = iterator.lookAhead {
+		token: while let (index, token) = iterator.next() {
 			switch token {
 			case .keyword(let keyword):
 				switch keyword {
@@ -177,7 +177,7 @@ struct AbstractSyntaxTree {
 			} while consume(operator: .comma)
 		}
 		var body = [ProtocolStatement]()
-		token: while let (index, token) = iterator.lookAhead {
+		token: while let (index, token) = iterator.next() {
 			switch token {
 			case .keyword(let keyword):
 				switch keyword {
