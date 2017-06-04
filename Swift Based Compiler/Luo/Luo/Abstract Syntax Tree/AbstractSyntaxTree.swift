@@ -666,25 +666,26 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func parameter() throws -> Parameter? {
-		var name: Identifier? = try identifier() as Identifier
-		let otherName = try optionalName() // TODO: this won't work
+		var label: Identifier? = try identifier() as Identifier
+		let name: Identifier? = try identifier()
 		var variable: TypedIdentifier
 		var theType: Type?
 		if consume(operator: .colon) {
 			theType = try type()
 		}
-		if otherName != nil {
-			variable = TypedIdentifier(identifier: otherName!, type: theType)
+
+		if name != nil {
+			variable = TypedIdentifier(identifier: name!, type: theType)
 		}
 		else {
-			variable = TypedIdentifier(identifier: name!, type: theType)
-			name = nil
+			variable = TypedIdentifier(identifier: label!, type: theType)
+			label = nil
 		}
 		var defaultValue: Expression?
 		if consume(operator: .equal) {
 			defaultValue = try expression() as Expression
 		}
-		return Parameter(name: name, variable: variable, default: defaultValue)
+		return Parameter(label: name, variable: variable, default: defaultValue)
 	}
 	
 	mutating func functionHead() throws -> (parameters: [Parameter], returns: [Type], isVarArg: Bool) {

@@ -128,7 +128,7 @@ indirect enum Expression: PrefixExpression, FieldIndex {
 
 struct Parameter {
 	
-	let name: Identifier? // the externally accessible name
+	let label: Identifier? // the externally accessible name
 	let variable: TypedIdentifier // the type and internal name
 	let `default`: Expression?
 	
