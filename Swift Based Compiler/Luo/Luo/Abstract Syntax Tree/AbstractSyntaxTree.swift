@@ -599,7 +599,7 @@ struct AbstractSyntaxTree {
 		else {
 			// this is a name or index type
 			let name: Identifier = try identifier()
-			if consume(operator: .comma) {
+			if consume(operator: .dot) {
 				theType = .index(parent: name, name: try identifier(), at: index)
 			}
 			else {
