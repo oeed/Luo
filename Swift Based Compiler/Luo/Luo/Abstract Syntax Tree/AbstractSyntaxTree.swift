@@ -317,7 +317,7 @@ struct AbstractSyntaxTree {
 		else {
 			let (prefix, index) = try prefixExpression()
 			// this could be a variable list or function call
-			if consume(operators: .comma, .equal) {
+			if isNext(operators: .comma, .equal) {
 				assignables.append(try assignmentVariable(from: prefix, at: index))
 			}
 			else {
@@ -418,14 +418,13 @@ struct AbstractSyntaxTree {
 		return false
 	}
 	
-	mutating func consume(operators target1: Operator, _ target2: Operator) -> Bool {
+	mutating func isNext(operators target1: Operator, _ target2: Operator) -> Bool {
 		if let (_, token) = iterator.lookAhead {
 			switch token {
 			case .operator(let op):
 				switch op {
 				case target1, target2:
 					// found what we're looking for, jump over it
-					iterator.skip()
 					return true
 				default: break
 				}
