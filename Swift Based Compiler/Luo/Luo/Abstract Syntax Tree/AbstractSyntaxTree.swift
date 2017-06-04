@@ -563,7 +563,7 @@ struct AbstractSyntaxTree {
 		if consume(operator: .colon) {
 			repeat {
 				returns.append(try type())
-			} while try !consume(operator: .comma)
+			} while !consume(operator: .comma)
 		}
 		
 		return (parameters: parameters, returns: returns, isVarArg: isVarArg)
