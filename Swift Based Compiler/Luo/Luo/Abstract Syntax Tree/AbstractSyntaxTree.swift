@@ -30,14 +30,38 @@ extension Collection where Indices.Iterator.Element == Index {
 
 struct AbstractSyntaxTree {
 	
-	var tree: Block!
+	var tree: Chunk!
 	private var iterator: LexerIterator
 	let lexer: Lexer
 	
 	init(lexer: Lexer) throws {
 		iterator = lexer.makeIterator()
 		self.lexer = lexer
-		self.tree = try block()
+		self.tree = try chunk()
+	}
+	
+	mutating func chunk() throws -> Chunk {
+		var topStatements = [TopStatement]()
+		token: while let (index, token) = iterator.lookAhead {
+			switch token {
+			case .keyword(let keyword):
+				switch keyword {
+				case .class:
+					topStatements.append(.class(try `class`(), at: index))
+				case .enum:
+					topStatements.append(.enum(try `enum`(), at: index))
+				case .protocol:
+					topStatements.append(.protocol(try `protocol`(), at: index))
+				case .end:
+					break token
+				default:
+					topStatements.append(.statement(try statement()!, at: index))
+				}
+			default:
+				throw ParserError.unexpected(token: token, at: index)
+			}
+		}
+		return topStatements
 	}
 	
 	mutating func block(endDelimiter: Bool = true, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Block {
@@ -52,6 +76,18 @@ struct AbstractSyntaxTree {
 			}
 		}
 		return statements
+	}
+	
+	mutating func `class`() throws -> Class {
+		try expect(keyword: .class)
+	}
+	
+	mutating func `enum`() throws -> Enum {
+		try expect(keyword: .enum)
+	}
+	
+	mutating func `protocol`() throws -> Protocol {
+		try expect(keyword: .protocol)
 	}
 	
 	mutating func statement(hasReturned: Bool = false, endDelimiter: Bool = false, elseDelimiter: Bool = false, untilDelimiter: Bool = false) throws -> Statement? {

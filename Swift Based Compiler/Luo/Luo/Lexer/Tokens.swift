@@ -76,6 +76,8 @@ enum Keyword: String {
 	case until = "until"
 	case `while` = "while"
 	case `class` = "class"
+	case `protocol` = "protocol"
+	case `default` = "default"
 	case property = "property"
 	case `is` = "is"
 	case `enum` = "enum"

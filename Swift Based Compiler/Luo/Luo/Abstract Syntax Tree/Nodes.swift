@@ -12,10 +12,10 @@ typealias Chunk = [TopStatement]
 
 enum TopStatement {
 	
-	case `class`(class: Class, at: TokenIndex)
-	case `protocol`(protocol: Protocol, at: TokenIndex)
-	case `enum`(enum: Enum, at: TokenIndex)
-	case statement(statement: Statement, at: TokenIndex)
+	case `class`(Class, at: TokenIndex)
+	case `protocol`(Protocol, at: TokenIndex)
+	case `enum`(Enum, at: TokenIndex)
+	case statement(Statement, at: TokenIndex)
 	
 }
 
