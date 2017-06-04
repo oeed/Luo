@@ -81,7 +81,7 @@ indirect enum Statement {
 	case `while`(condition: Expression, block: Block, at: TokenIndex)
 	case `repeat`(block: Block, condition: Expression, at: TokenIndex)
 	case `if`(conditionals: [(Expression, Block)], else: Block?, at: TokenIndex)
-	case forNumerical(variable: Identifier, start: Expression, stop: Expression, increment: Expression?, block: Block, at: TokenIndex)
+	case forNumerical(variable: TypedIdentifier, start: Expression, stop: Expression, increment: Expression?, block: Block, at: TokenIndex)
     case forIn(variables: [TypedIdentifier], iterators: [Expression], block: Block, at: TokenIndex)
 	case local(variables: [TypedIdentifier], values: [Expression], at: TokenIndex)
 	case localFunction(name: Identifier, function: Expression, at: TokenIndex)

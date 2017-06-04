@@ -121,7 +121,7 @@ struct AbstractSyntaxTree {
 	// for situations like (Name ":")? Type, we check if there's a : and return the name if so
 	mutating func optionalName() throws -> Identifier? {
 		// check if the token after the next token is :, if so we expect a name
-		let name: Identifier?
+		var name: Identifier?
 		if let (_, token) = iterator.doubleLookAhead {
 			switch token {
 			case .operator(let op):
@@ -130,7 +130,9 @@ struct AbstractSyntaxTree {
 					// we're expecting a name
 					name = try identifier() as Identifier
 					iterator.skip() // jump over the :
+				default: break
 				}
+			default: break
 			}
 		}
 		return name
@@ -806,7 +808,7 @@ struct AbstractSyntaxTree {
 	mutating func local(at index: TokenIndex) throws -> Statement {
 		// we need to determine whether this is a local function declaration or variable
 		var isFunction: Bool?
-		var variables = [Identifier]()
+		var variables = [TypedIdentifier]()
 		var expectComma = false
 		while let (tokenIndex, token) = iterator.next() {
 			token: switch token {
@@ -816,7 +818,11 @@ struct AbstractSyntaxTree {
 					return .localFunction(name: identifier, function: try functionBody(at: tokenIndex), at: index)
 				}
 				else if expectComma == false {
-					variables.append(identifier)
+					var theType: Type?
+					if consume(operator: .colon) {
+						theType = try type()
+					}
+					variables.append(TypedIdentifier(identifier: identifier, type: theType))
 					expectComma = true
 					isFunction = false
 					break
@@ -901,7 +907,7 @@ struct AbstractSyntaxTree {
 	
 	mutating func forStatement(at index: TokenIndex) throws -> Statement {
 		// at this stage we've no idea whether the for loop is a 'for a in b` or `for i = a, b`
-		var variables = [Identifier]()
+		var variables = [TypedIdentifier]()
 		var isNumerical: Bool?
 		var expectComma = false
 		variables: while true {
@@ -911,7 +917,11 @@ struct AbstractSyntaxTree {
 					if isNumerical != nil, isNumerical! {
 						throw ParserError.unexpected(token: token, at: index)
 					} // numerical loops shouldn't have more than one variable
-					variables.append(identifier)
+					var theType: Type?
+					if consume(operator: .colon) {
+						theType = try type()
+					}
+					variables.append(TypedIdentifier(identifier: identifier, type: theType))
 					expectComma = true
 				case .operator(let op):
 					switch op {
@@ -994,26 +1004,3 @@ struct AbstractSyntaxTree {
 	}
 	
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
