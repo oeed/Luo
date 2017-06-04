@@ -12,8 +12,8 @@ import Cocoa
 enum ParserError: Error {
 	case unexpected(token: Token, at: TokenIndex)
 	case alreadyReturned(at: TokenIndex)
-	case invalidVariable(variable: Assignable, at: TokenIndex)
-	case invalidCall(call: Assignable, at: TokenIndex)
+	case invalidAssignmentVariable(variable: PrefixExpression, at: TokenIndex)
+	case invalidCall(call: PrefixExpression, at: TokenIndex)
 	case expectedExpression(at: TokenIndex)
 	case endOfStream
 }
@@ -288,66 +288,63 @@ struct AbstractSyntaxTree {
 		return nil
 	}
 	
-	func validate(variable: Assignable, at index: TokenIndex) throws {
-		if !(variable is ExpressionIndex || variable is IdentifierIndex || variable is Identifier) {
-			throw ParserError.invalidVariable(variable: variable, at: index) // TODO: we probably need location information here
+	func assignmentVariable(from prefix: PrefixExpression, at index: TokenIndex) throws -> AssignmentVariable {
+		if prefix is ExpressionIndex || prefix is IdentifierIndex {
+			return prefix as! AssignmentVariable
+		}
+		else if prefix is Identifier {
+			return TypedIdentifier(identifier: prefix as! Identifier, type: nil)
+		}
+		else {
+			throw ParserError.invalidAssignmentVariable(variable: prefix, at: index) // TODO: we probably need location information here
 		}
 	}
 	
-	func validate(call: Assignable, at index: TokenIndex) throws {
-		if !(call is Callable) {
-			throw ParserError.invalidCall(call: call, at: index)
-		}
-	}
-	
-	// TODO: VariableAssignment
+	// TODO: AssignmentVariable
 	mutating func assignmentOrFunctionCall(at index: TokenIndex) throws -> Statement {
-		let prefix = try prefixExpression()
-		
-		switch prefix {
-		case .prefix(let assignable, at: let index):
-			// this could be a variable list or function call
-			if let (lookAheadIndex, lookAheadToken) = iterator.lookAhead {
-				switch lookAheadToken {
-				case .operator(let op):
-					switch op {
-					case .comma, .equal:
-						// we are a variable assignment
-						try validate(variable: assignable, at: lookAheadIndex)
-						var assignables: [Assignable] = [assignable]
-
-						// get any subsequent variables
-						while consume(operator: .comma) {
-							switch try prefixExpression() {
-							case .prefix(let assignable, _):
-								try validate(variable: assignable, at: iterator.nextIndex) // TODO: these references to iterator.nextIndex might be incorrect
-								assignables.append(assignable)
-							default: break
-							}
-						}
-						
-						try expect(operator: .equal)
-						
-						// get the expressions for assignment
-						var expressions = [Expression]()
-						repeat {
-							expressions.append(try expression())
-						}
-						while consume(operator: .comma)
-						
-						return Statement.assignment(assignables: assignables, expressions: expressions, at: index)
-					default: break // we are a function call (or invalid)
-					}
-				default: break // we are a function call (or invalid)
-				}
-			}
-			
-			// should be a function call, validate first
-			try validate(call: assignable, at: index)
-			return Statement.call(assignable as! Callable, at: index)
-		default:
-			throw ParserError.endOfStream // TODO: don't think this should ever happen, maybe handle it differently
+		var assignables = [AssignmentVariable]()
+		if let name = try optionalName() {
+			// this is a typed value, and hence can only be a TypedName, which must be an assignment
+			assignables.append(TypedIdentifier(identifier: name, type: try type()))
 		}
+		else {
+			let (prefix, index) = try prefixExpression()
+			// this could be a variable list or function call
+			if consume(operators: .comma, .equal) {
+				assignables.append(try assignmentVariable(from: prefix, at: index))
+			}
+			else {
+				// should be a function call, validate first
+				if !(prefix is Callable) {
+					throw ParserError.invalidCall(call: prefix, at: index)
+				}
+				return Statement.call(prefix as! Callable, at: index)
+			}
+		}
+		
+		// get any subsequent variables
+		while consume(operator: .comma) {
+			if let name = try optionalName() {
+				// this is a typed value, and hence can only be a TypedName, which must be an assignment
+				assignables.append(TypedIdentifier(identifier: name, type: try type()))
+			}
+			else {
+				let (prefix, index) = try prefixExpression()
+				assignables.append(try assignmentVariable(from: prefix, at: index))
+			}
+		}
+		
+		try expect(operator: .equal)
+		
+		// get the expressions for assignment
+		var expressions = [Expression]()
+		repeat {
+			expressions.append(try expression())
+		}
+		while consume(operator: .comma)
+		
+		return Statement.assignment(assignables: assignables, expressions: expressions, at: index)
+
 	}
 	
 	mutating func expect(keyword target: Keyword) throws {
@@ -396,13 +393,30 @@ struct AbstractSyntaxTree {
 		}
 		return false
 	}
+	
+	mutating func consume(operators target1: Operator, _ target2: Operator) -> Bool {
+		if let (_, token) = iterator.lookAhead {
+			switch token {
+			case .operator(let op):
+				switch op {
+				case target1, target2:
+					// found what we're looking for, jump over it
+					iterator.skip()
+					return true
+				default: break
+				}
+			default: break
+			}
+		}
+		return false
+	}
 
-    mutating func prefixExpression() throws -> Expression {
+	mutating func prefixExpression() throws -> (PrefixExpression, at: TokenIndex) {
         return try prefixExpression(optional: false)!
     }
     
-    mutating func prefixExpression(optional: Bool = true) throws -> Expression? {
-		var node: Assignable
+    mutating func prefixExpression(optional: Bool = true) throws -> (PrefixExpression, at: TokenIndex)? {
+		var node: PrefixExpression
 		let expressionIndex: TokenIndex
 		if let (index, token) = iterator.lookAhead {
 			expressionIndex = index
@@ -462,7 +476,7 @@ struct AbstractSyntaxTree {
 					}
 				case .string(let string):
 					// a string call (i.e. print "Hello world!")
-					node = Call(callee: node, arguments: [.string(string, at: tokenIndex)])
+					node = Call(callee: node, arguments: [Argument(name: nil, value: .string(string, at: tokenIndex))])
 				default:
 					// there are no more tokens that add meaning to this prefix expression, return it
 					iterator.undo()
@@ -475,7 +489,7 @@ struct AbstractSyntaxTree {
 			}
 		}
 		
-        return Expression.prefix(node, at: expressionIndex)
+        return (node, at: expressionIndex)
 	}
 	
 	mutating func arguments(at index: TokenIndex) throws -> [Argument] {
@@ -732,8 +746,8 @@ struct AbstractSyntaxTree {
 				if exp == nil {
 					// wasn't a primary expression, must be a prefixExpression
 					iterator.undo()
-					if let prefix = try prefixExpression() as Expression? {
-                        exp = prefix
+					if let (prefix, index) = try prefixExpression(optional: true) {
+						exp = .prefix(prefix, at: index)
                     }
                     else {
 						return nil

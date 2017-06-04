@@ -36,9 +36,9 @@ Type ::= (Name ("." Name)? | "[" Type "]" | "[" Type ":" Type "]") ("?")?
 
 FunctionName ::= Name ("." Name)* (":" Name)?
 
-VariableList ::= VariableAssignment ("," VariableAssignment)*
+VariableList ::= AssignmentVariable ("," AssignmentVariable)*
 
-VariableAssignment ::=  TypedName |
+AssignmentVariable ::=  TypedName |
   PrefixExpression "[" Expression "]" |
   PrefixExpression "." Name
 

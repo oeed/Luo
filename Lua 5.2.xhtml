@@ -893,10 +893,10 @@
          </defs>
          <polygon points="9 61 1 57 1 65"/>
          <polygon points="17 61 9 57 9 65"/>
-         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#VariableAssignment" xlink:title="VariableAssignment">
+         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#AssignmentVariable" xlink:title="AssignmentVariable">
             <rect x="51" y="47" width="134" height="32"/>
             <rect x="49" y="45" width="134" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="59" y="65">VariableAssignment</text>
+            <text class="nonterminal" x="59" y="65">AssignmentVariable</text>
          </a>
          <rect x="51" y="3" width="24" height="32" rx="10"/>
          <rect x="49" y="1" width="24" height="32" class="terminal" rx="10"/>
@@ -907,13 +907,13 @@
       </svg>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">
          <xhtml:div class="ebnf"><xhtml:pre><a href="#VariableList" title="VariableList">VariableList</a>
-         ::= <a href="#VariableAssignment" title="VariableAssignment">VariableAssignment</a> ( ',' <a href="#VariableAssignment" title="VariableAssignment">VariableAssignment</a> )*</xhtml:pre></xhtml:div>
+         ::= <a href="#AssignmentVariable" title="AssignmentVariable">AssignmentVariable</a> ( ',' <a href="#AssignmentVariable" title="AssignmentVariable">AssignmentVariable</a> )*</xhtml:pre></xhtml:div>
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
             <xhtml:li><xhtml:a href="#Statement" title="Statement">Statement</xhtml:a></xhtml:li>
          </xhtml:ul>
-      </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="VariableAssignment">VariableAssignment:</xhtml:a></xhtml:p>
+      </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="AssignmentVariable">AssignmentVariable:</xhtml:a></xhtml:p>
       <svg xmlns="http://www.w3.org/2000/svg" width="450" height="124">
          <defs>
             <style type="text/css">
@@ -980,7 +980,7 @@
          <polygon points="441 17 433 13 433 21"/>
       </svg>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">
-         <xhtml:div class="ebnf"><xhtml:pre><a href="#VariableAssignment" title="VariableAssignment">VariableAssignment</a>
+         <xhtml:div class="ebnf"><xhtml:pre><a href="#AssignmentVariable" title="AssignmentVariable">AssignmentVariable</a>
          ::= <a href="#TypedName" title="TypedName">TypedName</a>
            | <a href="#PrefixExpression" title="PrefixExpression">PrefixExpression</a> ( '[' <a href="#Expression" title="Expression">Expression</a> ']' | '.' <a href="#Name" title="Name">Name</a> )</xhtml:pre></xhtml:div>
       </xhtml:p>
@@ -1118,11 +1118,11 @@
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
+            <xhtml:li><xhtml:a href="#AssignmentVariable" title="AssignmentVariable">AssignmentVariable</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#NameList" title="NameList">NameList</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Parameter" title="Parameter">Parameter</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Property" title="Property">Property</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#ProtocolProperty" title="ProtocolProperty">ProtocolProperty</xhtml:a></xhtml:li>
-            <xhtml:li><xhtml:a href="#VariableAssignment" title="VariableAssignment">VariableAssignment</xhtml:a></xhtml:li>
          </xhtml:ul>
       </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="NameList">NameList:</xhtml:a></xhtml:p>
       <svg xmlns="http://www.w3.org/2000/svg" width="188" height="80">
@@ -1364,6 +1364,7 @@
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
             <xhtml:li><xhtml:a href="#Argument" title="Argument">Argument</xhtml:a></xhtml:li>
+            <xhtml:li><xhtml:a href="#AssignmentVariable" title="AssignmentVariable">AssignmentVariable</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Default" title="Default">Default</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#EnumCase" title="EnumCase">EnumCase</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Expression" title="Expression">Expression</xhtml:a></xhtml:li>
@@ -1374,7 +1375,6 @@
             <xhtml:li><xhtml:a href="#Property" title="Property">Property</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Statement" title="Statement">Statement</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Variable" title="Variable">Variable</xhtml:a></xhtml:li>
-            <xhtml:li><xhtml:a href="#VariableAssignment" title="VariableAssignment">VariableAssignment</xhtml:a></xhtml:li>
          </xhtml:ul>
       </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="PrefixExpression">PrefixExpression:</xhtml:a></xhtml:p>
       <svg xmlns="http://www.w3.org/2000/svg" width="274" height="124">
@@ -1442,10 +1442,10 @@
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
+            <xhtml:li><xhtml:a href="#AssignmentVariable" title="AssignmentVariable">AssignmentVariable</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Expression" title="Expression">Expression</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#FunctionCall" title="FunctionCall">FunctionCall</xhtml:a></xhtml:li>
             <xhtml:li><xhtml:a href="#Variable" title="Variable">Variable</xhtml:a></xhtml:li>
-            <xhtml:li><xhtml:a href="#VariableAssignment" title="VariableAssignment">VariableAssignment</xhtml:a></xhtml:li>
          </xhtml:ul>
       </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="FunctionCall">FunctionCall:</xhtml:a></xhtml:p>
       <svg xmlns="http://www.w3.org/2000/svg" width="436" height="68">
@@ -1796,8 +1796,7 @@
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
-            <xhtml:li><xhtml:a href="#FunctionBody" title="FunctionBody">FunctionBody</xhtml:a></xhtml:li>
-            <xhtml:li><xhtml:a href="#ProtocolFunction" title="ProtocolFunction">ProtocolFunction</xhtml:a></xhtml:li>
+            <xhtml:li><xhtml:a href="#FunctionHead" title="FunctionHead">FunctionHead</xhtml:a></xhtml:li>
          </xhtml:ul>
       </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="Parameter">Parameter:</xhtml:a></xhtml:p>
       <svg xmlns="http://www.w3.org/2000/svg" width="456" height="68">
@@ -1923,11 +1922,10 @@
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
-            <xhtml:li><xhtml:a href="#FunctionBody" title="FunctionBody">FunctionBody</xhtml:a></xhtml:li>
-            <xhtml:li><xhtml:a href="#ProtocolFunction" title="ProtocolFunction">ProtocolFunction</xhtml:a></xhtml:li>
+            <xhtml:li><xhtml:a href="#FunctionHead" title="FunctionHead">FunctionHead</xhtml:a></xhtml:li>
          </xhtml:ul>
-      </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="FunctionBody">FunctionBody:</xhtml:a></xhtml:p>
-      <svg xmlns="http://www.w3.org/2000/svg" width="574" height="68">
+      </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="FunctionHead">FunctionHead:</xhtml:a></xhtml:p>
+      <svg xmlns="http://www.w3.org/2000/svg" width="438" height="68">
          <defs>
             <style type="text/css">
                @namespace "http://www.w3.org/2000/svg";
@@ -1975,21 +1973,72 @@
             <rect x="303" y="33" width="86" height="32" class="nonterminal"/>
             <text class="nonterminal" x="313" y="53">ReturnType</text>
          </a>
-         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#Block" xlink:title="Block">
-            <rect x="431" y="3" width="52" height="32"/>
-            <rect x="429" y="1" width="52" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="439" y="21">Block</text>
+         <svg:path xmlns:svg="http://www.w3.org/2000/svg" class="line" d="m17 17 h2 m0 0 h10 m26 0 h10 m20 0 h10 m0 0 h112 m-142 0 h20 m122 0 h20 m-162 0 q10 0 10 10 m142 0 q0 -10 10 -10 m-152 10 v12 m142 0 v-12 m-142 12 q0 10 10 10 m122 0 q10 0 10 -10 m-132 10 h10 m102 0 h10 m20 -32 h10 m26 0 h10 m20 0 h10 m0 0 h96 m-126 0 h20 m106 0 h20 m-146 0 q10 0 10 10 m126 0 q0 -10 10 -10 m-136 10 v12 m126 0 v-12 m-126 12 q0 10 10 10 m106 0 q10 0 10 -10 m-116 10 h10 m86 0 h10 m23 -32 h-3"/>
+         <polygon points="429 17 437 13 437 21"/>
+         <polygon points="429 17 421 13 421 21"/>
+      </svg>
+      <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">
+         <xhtml:div class="ebnf"><xhtml:pre><a href="#FunctionHead" title="FunctionHead">FunctionHead</a>
+         ::= '(' <a href="#ParameterList" title="ParameterList">ParameterList</a>? ')' <a href="#ReturnType" title="ReturnType">ReturnType</a>?</xhtml:pre></xhtml:div>
+      </xhtml:p>
+      <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
+         <xhtml:ul>
+            <xhtml:li><xhtml:a href="#FunctionBody" title="FunctionBody">FunctionBody</xhtml:a></xhtml:li>
+            <xhtml:li><xhtml:a href="#ProtocolFunction" title="ProtocolFunction">ProtocolFunction</xhtml:a></xhtml:li>
+         </xhtml:ul>
+      </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="FunctionBody">FunctionBody:</xhtml:a></xhtml:p>
+      <svg xmlns="http://www.w3.org/2000/svg" width="294" height="36">
+         <defs>
+            <style type="text/css">
+               @namespace "http://www.w3.org/2000/svg";
+               .line                 {fill: none; stroke: #002233;}
+               .bold-line            {stroke: #000E14; shape-rendering: crispEdges; stroke-width:
+               2; }
+               .thin-line            {stroke: #00141F; shape-rendering: crispEdges}
+               .filled               {fill: #002233; stroke: none;}
+               text.terminal         {font-family: Verdana, Sans-serif;
+               font-size: 12px;
+               fill: #000E14;
+               font-weight: bold;
+               }
+               text.nonterminal      {font-family: Verdana, Sans-serif;
+               font-size: 12px;
+               fill: #00111A;
+               }
+               text.regexp           {font-family: Verdana, Sans-serif;
+               font-size: 12px;
+               fill: #00141F;
+               }
+               rect, circle, polygon {fill: #002233; stroke: #002233;}
+               rect.terminal         {fill: #4DC3FF; stroke: #002233;}
+               rect.nonterminal      {fill: #9EDFFF; stroke: #002233;}
+               rect.text             {fill: none; stroke: none;}    
+               polygon.regexp        {fill: #C7ECFF; stroke: #002233;}
+               
+            </style>
+         </defs>
+         <polygon points="9 17 1 13 1 21"/>
+         <polygon points="17 17 9 13 9 21"/>
+         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#FunctionHead" xlink:title="FunctionHead">
+            <rect x="31" y="3" width="100" height="32"/>
+            <rect x="29" y="1" width="100" height="32" class="nonterminal"/>
+            <text class="nonterminal" x="39" y="21">FunctionHead</text>
          </a>
-         <rect x="503" y="3" width="44" height="32" rx="10"/>
-         <rect x="501" y="1" width="44" height="32" class="terminal" rx="10"/>
-         <text class="terminal" x="511" y="21">end</text>
-         <svg:path xmlns:svg="http://www.w3.org/2000/svg" class="line" d="m17 17 h2 m0 0 h10 m26 0 h10 m20 0 h10 m0 0 h112 m-142 0 h20 m122 0 h20 m-162 0 q10 0 10 10 m142 0 q0 -10 10 -10 m-152 10 v12 m142 0 v-12 m-142 12 q0 10 10 10 m122 0 q10 0 10 -10 m-132 10 h10 m102 0 h10 m20 -32 h10 m26 0 h10 m20 0 h10 m0 0 h96 m-126 0 h20 m106 0 h20 m-146 0 q10 0 10 10 m126 0 q0 -10 10 -10 m-136 10 v12 m126 0 v-12 m-126 12 q0 10 10 10 m106 0 q10 0 10 -10 m-116 10 h10 m86 0 h10 m20 -32 h10 m52 0 h10 m0 0 h10 m44 0 h10 m3 0 h-3"/>
-         <polygon points="565 17 573 13 573 21"/>
-         <polygon points="565 17 557 13 557 21"/>
+         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#Block" xlink:title="Block">
+            <rect x="151" y="3" width="52" height="32"/>
+            <rect x="149" y="1" width="52" height="32" class="nonterminal"/>
+            <text class="nonterminal" x="159" y="21">Block</text>
+         </a>
+         <rect x="223" y="3" width="44" height="32" rx="10"/>
+         <rect x="221" y="1" width="44" height="32" class="terminal" rx="10"/>
+         <text class="terminal" x="231" y="21">end</text>
+         <svg:path xmlns:svg="http://www.w3.org/2000/svg" class="line" d="m17 17 h2 m0 0 h10 m100 0 h10 m0 0 h10 m52 0 h10 m0 0 h10 m44 0 h10 m3 0 h-3"/>
+         <polygon points="285 17 293 13 293 21"/>
+         <polygon points="285 17 277 13 277 21"/>
       </svg>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">
          <xhtml:div class="ebnf"><xhtml:pre><a href="#FunctionBody" title="FunctionBody">FunctionBody</a>
-         ::= '(' <a href="#ParameterList" title="ParameterList">ParameterList</a>? ')' <a href="#ReturnType" title="ReturnType">ReturnType</a>? <a href="#Block" title="Block">Block</a> 'end'</xhtml:pre></xhtml:div>
+         ::= <a href="#FunctionHead" title="FunctionHead">FunctionHead</a> <a href="#Block" title="Block">Block</a> 'end'</xhtml:pre></xhtml:div>
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>
@@ -2552,7 +2601,7 @@
             <xhtml:li><xhtml:a href="#ProtocolBody" title="ProtocolBody">ProtocolBody</xhtml:a></xhtml:li>
          </xhtml:ul>
       </xhtml:p><xhtml:br xmlns:xhtml="http://www.w3.org/1999/xhtml" /><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml" style="font-size: 14px; font-weight:bold"><xhtml:a name="ProtocolFunction">ProtocolFunction:</xhtml:a></xhtml:p>
-      <svg xmlns="http://www.w3.org/2000/svg" width="530" height="68">
+      <svg xmlns="http://www.w3.org/2000/svg" width="250" height="36">
          <defs>
             <style type="text/css">
                @namespace "http://www.w3.org/2000/svg";
@@ -2587,29 +2636,18 @@
          <rect x="31" y="3" width="72" height="32" rx="10"/>
          <rect x="29" y="1" width="72" height="32" class="terminal" rx="10"/>
          <text class="terminal" x="39" y="21">function</text>
-         <rect x="123" y="3" width="26" height="32" rx="10"/>
-         <rect x="121" y="1" width="26" height="32" class="terminal" rx="10"/>
-         <text class="terminal" x="131" y="21">(</text>
-         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#ParameterList" xlink:title="ParameterList">
-            <rect x="189" y="35" width="102" height="32"/>
-            <rect x="187" y="33" width="102" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="197" y="53">ParameterList</text>
+         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#FunctionHead" xlink:title="FunctionHead">
+            <rect x="123" y="3" width="100" height="32"/>
+            <rect x="121" y="1" width="100" height="32" class="nonterminal"/>
+            <text class="nonterminal" x="131" y="21">FunctionHead</text>
          </a>
-         <rect x="331" y="3" width="26" height="32" rx="10"/>
-         <rect x="329" y="1" width="26" height="32" class="terminal" rx="10"/>
-         <text class="terminal" x="339" y="21">)</text>
-         <a xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="#ReturnType" xlink:title="ReturnType">
-            <rect x="397" y="35" width="86" height="32"/>
-            <rect x="395" y="33" width="86" height="32" class="nonterminal"/>
-            <text class="nonterminal" x="405" y="53">ReturnType</text>
-         </a>
-         <svg:path xmlns:svg="http://www.w3.org/2000/svg" class="line" d="m17 17 h2 m0 0 h10 m72 0 h10 m0 0 h10 m26 0 h10 m20 0 h10 m0 0 h112 m-142 0 h20 m122 0 h20 m-162 0 q10 0 10 10 m142 0 q0 -10 10 -10 m-152 10 v12 m142 0 v-12 m-142 12 q0 10 10 10 m122 0 q10 0 10 -10 m-132 10 h10 m102 0 h10 m20 -32 h10 m26 0 h10 m20 0 h10 m0 0 h96 m-126 0 h20 m106 0 h20 m-146 0 q10 0 10 10 m126 0 q0 -10 10 -10 m-136 10 v12 m126 0 v-12 m-126 12 q0 10 10 10 m106 0 q10 0 10 -10 m-116 10 h10 m86 0 h10 m23 -32 h-3"/>
-         <polygon points="521 17 529 13 529 21"/>
-         <polygon points="521 17 513 13 513 21"/>
+         <svg:path xmlns:svg="http://www.w3.org/2000/svg" class="line" d="m17 17 h2 m0 0 h10 m72 0 h10 m0 0 h10 m100 0 h10 m3 0 h-3"/>
+         <polygon points="241 17 249 13 249 21"/>
+         <polygon points="241 17 233 13 233 21"/>
       </svg>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">
          <xhtml:div class="ebnf"><xhtml:pre><a href="#ProtocolFunction" title="ProtocolFunction">ProtocolFunction</a>
-         ::= 'function' '(' <a href="#ParameterList" title="ParameterList">ParameterList</a>? ')' <a href="#ReturnType" title="ReturnType">ReturnType</a>?</xhtml:pre></xhtml:div>
+         ::= 'function' <a href="#FunctionHead" title="FunctionHead">FunctionHead</a></xhtml:pre></xhtml:div>
       </xhtml:p>
       <xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">referenced by:
          <xhtml:ul>

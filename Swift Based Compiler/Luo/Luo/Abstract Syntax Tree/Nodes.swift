@@ -77,7 +77,7 @@ typealias Label = String
 indirect enum Statement {
 	
 	case `do`(block: Block, at: TokenIndex)
-	case assignment(assignables: [VariableAssignment], expressions: [Expression], at: TokenIndex)
+	case assignment(assignables: [AssignmentVariable], expressions: [Expression], at: TokenIndex)
 	case `while`(condition: Expression, block: Block, at: TokenIndex)
 	case `repeat`(block: Block, condition: Expression, at: TokenIndex)
 	case `if`(conditionals: [(Expression, Block)], else: Block?, at: TokenIndex)
@@ -314,23 +314,23 @@ struct Invocation: Callable {
     
 }
 
-protocol VariableAssignment {}
+protocol AssignmentVariable {}
 
-struct TypedIdentifier: VariableAssignment {
+struct TypedIdentifier: AssignmentVariable {
 	
 	let identifier: Identifier
 	let type: Type?
 	
 }
 
-struct ExpressionIndex: PrefixExpression, VariableAssignment {
+struct ExpressionIndex: PrefixExpression, AssignmentVariable {
 	
 	let indexed: PrefixExpression
 	let index: Expression
 	
 }
 
-struct IdentifierIndex: PrefixExpression, VariableAssignment {
+struct IdentifierIndex: PrefixExpression, AssignmentVariable {
 	
 	let indexed: PrefixExpression
 	let index: Identifier
