@@ -118,6 +118,24 @@ struct AbstractSyntaxTree {
 		return Class(name: name, conforms: conforms, body: body)
 	}
 	
+	// for situations like (Name ":")? Type, we check if there's a : and return the name if so
+	mutating func optionalName() -> Identifier? {
+		// check if the token after the next token is :, if so we expect a name
+		let name: Identifier?
+		if let (_, token) = iterator.doubleLookAhead {
+			switch token {
+			case .operator(let op):
+				switch op {
+				case .colon:
+					// we're expecting a name
+					name = try identifier() as Identifier
+					iterator.skip() // jump over the :
+				}
+			}
+		}
+		return name
+	}
+	
 	mutating func `enum`() throws -> Enum {
 		try expect(keyword: .enum)
 		let name: Identifier = try identifier()
@@ -128,22 +146,7 @@ struct AbstractSyntaxTree {
 			var associatedTypes = [AssociatedType]()
 			if consume(operator: .roundBracketLeft) {
 				repeat {
-					// check if the token after the next token is :, if so we expect a name
-					var associatedName: Identifier?
-					
-					if let (_, token) = iterator.doubleLookAhead {
-						switch token {
-						case .operator(let op):
-							switch op {
-							case .colon:
-								// we're expecting a name
-								associatedName = try identifier() as Identifier
-								iterator.skip() // jump over the :
-							}
-						}
-					}
-					
-					associatedTypes.append(AssociatedType(name: associatedName, type: try type()))
+					associatedTypes.append(AssociatedType(name: optionalName(), type: try type()))
 				} while consume(operator: .comma)
 				try expect(operator: .roundBracketRight)
 			}
