@@ -105,7 +105,7 @@ struct AbstractSyntaxTree {
 					let value: Expression = try expression()
 					body.append(.default(name: name, value: value, at: index))
 				case .function:
-					body.append(.function(name: name, function: try functionBody(at: index.advanced(by: 1)), at: index))
+					body.append(.function(name: try identifier(), function: try functionBody(at: index.advanced(by: 1)), at: index))
 				case .end:
 					break token
 				default:
