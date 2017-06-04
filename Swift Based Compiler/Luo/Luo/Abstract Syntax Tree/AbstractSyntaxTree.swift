@@ -120,6 +120,41 @@ struct AbstractSyntaxTree {
 	
 	mutating func `enum`() throws -> Enum {
 		try expect(keyword: .enum)
+		let name: Identifier = try identifier()
+		var cases = [EnumCase]()
+		repeat {
+			let caseName: Identifier = try identifier()
+			var value: Expression?
+			var associatedTypes = [AssociatedType]()
+			if consume(operator: .roundBracketLeft) {
+				repeat {
+					// check if the token after the next token is :, if so we expect a name
+					var associatedName: Identifier?
+					
+					if let (_, token) = iterator.doubleLookAhead {
+						switch token {
+						case .operator(let op):
+							switch op {
+							case .colon:
+								// we're expecting a name
+								associatedName = try identifier() as Identifier
+								iterator.skip() // jump over the :
+							}
+						}
+					}
+					
+					associatedTypes.append(AssociatedType(name: associatedName, type: try type()))
+				} while consume(operator: .comma)
+				try expect(operator: .roundBracketRight)
+			}
+			
+			if consume(operator: .equal) {
+				value = try expression() as Expression?
+			}
+			cases.append(EnumCase(name: caseName, associatedTypes: associatedTypes, value: value))
+		} while consume(operator: .comma)
+		
+		return Enum(name: name, cases: cases)
 	}
 	
 	mutating func `protocol`() throws -> Protocol {

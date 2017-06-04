@@ -33,8 +33,12 @@ struct LexerIterator: IteratorProtocol {
 	
     var lookAhead: (TokenIndex, Token)? {
         return self[nextIndex]
-    }
-    
+	}
+	
+	var doubleLookAhead: (TokenIndex, Token)? {
+		return self[tokens.index(after: nextIndex)]
+	}
+	
     let lexer: Lexer
     
     subscript (_ index: TokenIndex) -> (TokenIndex, Token)? {
