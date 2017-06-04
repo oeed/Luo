@@ -546,7 +546,33 @@ struct AbstractSyntaxTree {
 	}
 	
 	mutating func type() throws -> Type {
-		// TODO:
+		var theType: Type!
+		let index = iterator.nextIndex
+		if consume(operator: .squareBracketLeft) {
+			// this is either an array or dictionary type
+			let subType = try type()
+			if consume(operator: .colon) {
+				theType = .dictionary(key: subType, value: try type(), at: index)
+			}
+			else {
+				theType = .array(value: subType, at: index)
+			}
+		}
+		else {
+			// this is a name or index type
+			let name: Identifier = try identifier()
+			if consume(operator: .comma) {
+				theType = .index(parent: name, name: try identifier(), at: index)
+			}
+			else {
+				theType = .name(name: name, at: index)
+			}
+		}
+		
+		if consume(operator: .optional) {
+			return .optional(theType)
+		}
+		return theType
 	}
 	
 	mutating func typedIdentifier() throws -> TypedIdentifier {

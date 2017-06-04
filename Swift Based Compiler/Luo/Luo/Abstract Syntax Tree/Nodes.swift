@@ -99,8 +99,8 @@ indirect enum Type {
 	case optional(Type)
 	case array(value: Type, at: TokenIndex)
 	case dictionary(key: Type, value: Type, at: TokenIndex)
-	case name(name: Identifier)
-	case index(parent: Identifier, name: Identifier)
+	case name(name: Identifier, at: TokenIndex)
+	case index(parent: Identifier, name: Identifier, at: TokenIndex)
 	
 }
 
