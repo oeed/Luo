@@ -10,6 +10,21 @@ import Foundation
 
 typealias Chunk = [TopStatement]
 
+
+
+protocol ObjectNode {
+	
+	var name: Name { get }
+	
+}
+
+typealias Conform = (Identifier, at: TokenIndex)
+protocol ConfirmingNode {
+	
+	var conforms: [Conform] { get }
+	
+}
+
 enum TopStatement {
 	
 	case `class`(Class, at: TokenIndex)
@@ -19,10 +34,10 @@ enum TopStatement {
 	
 }
 
-struct Class {
+struct Class: ObjectNode, ConfirmingNode {
 	
 	let name: Identifier
-	let conforms: [Identifier]
+	let conforms: [Conform]
 	let body: [ClassStatement]
 	
 }
@@ -35,10 +50,10 @@ enum ClassStatement {
 	
 }
 
-struct Protocol {
+struct Protocol: ObjectNode, ConfirmingNode {
 	
 	let name: Identifier
-	let conforms: [Identifier]
+	let conforms: [Conform]
 	let body: [ProtocolStatement]
 	
 }
@@ -50,7 +65,7 @@ enum ProtocolStatement {
 	
 }
 
-struct Enum {
+struct Enum: ObjectNode {
 	
 	let name: Identifier
 	let cases: [EnumCase]

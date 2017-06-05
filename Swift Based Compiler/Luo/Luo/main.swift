@@ -15,7 +15,9 @@ if CommandLine.arguments.count != 2 {
 
 if let lexer = try Lexer(path: CommandLine.arguments[1]) {
 	do {
-		let _ = try AbstractSyntaxTree(lexer: lexer)
+		let ast = try AbstractSyntaxTree(lexer: lexer)
+		var resolver = Resolver()
+		try resolver.resolve(chunks: [ast.tree])
     }
     catch ParserError.unexpected(token: let token, at: let index) {
         let position = lexer.position(of: index)!
@@ -24,7 +26,7 @@ if let lexer = try Lexer(path: CommandLine.arguments[1]) {
     catch ParserError.expectedExpression(at: let index) {
         let position = lexer.position(of: index)!
         print("Expected expression at line: \(position.line) col: \(position.column)")
-    }
+	}
 }
 else {
     print("Unable to open file: " + CommandLine.arguments[1])

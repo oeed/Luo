@@ -1,50 +1,10 @@
-class Person: Object
 
-	property isMale: Boolean? -- allows nil
-	property age: Number = 0
-	property firstName: String
-	property lastName: String
-	property language: Language.Type = EnglishLanguage.self -- .Type means that rather than being an instance, the vaule has to be the class/static itself (or a subclass' class/static)
-	property table: Table = {}
 
-	default otherThing = "One" -- overwrite the default value defined in a superclass
-
-	function initialise(firstName: String = "John", lastName: String = "Smith", isMale: Boolean)
-		-- anything here would need to support valid Lua
-		-- i.e. if you paste in vanilla Lua it'd work normally
-		-- this part is still statically typed though
-		local blah = "this" -- type = Any?
-		local num: Number = 4 -- this must be a number wherever its used
-
-		self.firstName = firstName
-		self.lastName = lastName
-		self.isMale = isMale
-
-		test(firstName)
-	end
-
-	function test(value): Boolean
-		-- note that value currently has type Any?
-		if value is String then
-			-- value is 100% a string
-		end
-
-		-- what do we want optionals to do? do we want to have to unwrap them?
-	end
-
+protocol One
 end
 
-enum SubmissionState
-	complete,
-	sent,
-	networkError(String),
-	validationError(String),
+class Two: One, One
 end
 
-protocol Object
-
-	property age: Number
-
-	function initialise(firstName: String, lastName: String, isMale: Boolean)
-
+class Three: Two, One
 end

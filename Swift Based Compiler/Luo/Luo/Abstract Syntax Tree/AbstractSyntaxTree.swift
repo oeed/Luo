@@ -81,10 +81,11 @@ struct AbstractSyntaxTree {
 	mutating func `class`() throws -> Class {
 		try expect(keyword: .class)
 		let name: Identifier = try identifier()
-		var conforms = [Identifier]()
+		var conforms = [Conform]()
 		if consume(operator: .colon) {
 			repeat {
-				conforms.append(try identifier())
+				let index = iterator.nextIndex
+				conforms.append((try identifier() as Identifier, at: index))
 			} while consume(operator: .comma)
 		}
 		var body = [ClassStatement]()
@@ -170,10 +171,11 @@ struct AbstractSyntaxTree {
 	mutating func `protocol`() throws -> Protocol {
 		try expect(keyword: .protocol)
 		let name: Identifier = try identifier()
-		var conforms = [Identifier]()
+		var conforms = [Conform]()
 		if consume(operator: .colon) {
 			repeat {
-				conforms.append(try identifier())
+				let index = iterator.nextIndex
+				conforms.append((try identifier() as Identifier, at: index))
 			} while consume(operator: .comma)
 		}
 		var body = [ProtocolStatement]()
