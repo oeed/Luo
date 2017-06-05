@@ -56,6 +56,7 @@ enum Operator { // TOD: Lua 5.3 binary operators
 }
 
 enum Keyword: String {
+	
 	case and = "and"
 	case `break` = "break"
 	case `do` = "do"
@@ -84,6 +85,7 @@ enum Keyword: String {
 	case goto = "goto"
 	case `true` = "true"
 	case `false` = "false"
+	case `typealias` = "typealias"
 }
 
 protocol TokenMatchable {

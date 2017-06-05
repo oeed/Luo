@@ -10,8 +10,6 @@ import Foundation
 
 typealias Chunk = [TopStatement]
 
-
-
 protocol ObjectNode {
 	
 	var name: Name { get }
@@ -31,6 +29,7 @@ enum TopStatement {
 	case `protocol`(Protocol, at: TokenIndex)
 	case `enum`(Enum, at: TokenIndex)
 	case statement(Statement, at: TokenIndex)
+	case `typealias`(Name, aliases: Type, at: TokenIndex)
 	
 }
 

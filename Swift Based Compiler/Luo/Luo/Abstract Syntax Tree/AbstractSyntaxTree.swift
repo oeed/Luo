@@ -52,6 +52,10 @@ struct AbstractSyntaxTree {
 					topStatements.append(.enum(try `enum`(), at: index))
 				case .protocol:
 					topStatements.append(.protocol(try `protocol`(), at: index))
+				case .typealias:
+					let name: Identifier = try identifier()
+					try expect(operator: .equal)
+					topStatements.append(.typealias(name, aliases: try type(), at: index))
 				case .end:
 					break token
 				default:

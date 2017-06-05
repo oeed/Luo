@@ -6,7 +6,8 @@ TopStatement ::=
   Class |
   Protocol |
   Enum |
-  Statement
+  Statement |
+  TypeAlias
 
 Statement ::=  ";" |
   VariableList "=" ExpressionList |
@@ -31,6 +32,8 @@ Statement ::=  ";" |
 LastStatement ::= "return" (ExpressionList)?
 
 Label ::= "::" Name "::"
+
+TypeAlias ::= "typealias" Name "=" Type
 
 Type ::= (Name ("." Name)? | "[" Type "]" | "[" Type ":" Type "]") ("?")?
 
