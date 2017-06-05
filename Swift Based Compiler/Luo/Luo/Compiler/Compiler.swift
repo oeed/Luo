@@ -19,6 +19,7 @@ struct Compiler {
 	init(abstractSyntaxTree: AbstractSyntaxTree) throws {
 		self.lexer = abstractSyntaxTree.lexer
 		self.topScope = Scope()
+
 		for statement in abstractSyntaxTree.tree {
 //			compile(statement: statement, scope: topScope)
 		}

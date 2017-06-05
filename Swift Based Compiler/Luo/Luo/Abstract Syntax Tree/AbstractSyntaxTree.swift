@@ -184,7 +184,8 @@ struct AbstractSyntaxTree {
 				case .property:
 					body.append(.property(name: try typedIdentifier(), at: index))
 				case .function:
-					let head = try functionHead()
+					let name: Identifier = try identifier()
+					let head = try functionHead(allowDefaults: false)
 					body.append(.function(name: name, parameters: head.parameters, returns: head.returns, isVarArg: head.isVarArg, at: index))
 				case .end:
 					break token
@@ -665,7 +666,7 @@ struct AbstractSyntaxTree {
 		return .table(fields, at: index)
 	}
 	
-	mutating func parameter() throws -> Parameter? {
+	mutating func parameter(allowDefaults: Bool) throws -> Parameter? {
 		var label: Identifier? = try identifier() as Identifier
 		let name: Identifier? = try identifier()
 		var variable: TypedIdentifier
@@ -682,17 +683,17 @@ struct AbstractSyntaxTree {
 			label = nil
 		}
 		var defaultValue: Expression?
-		if consume(operator: .equal) {
+		if allowDefaults && consume(operator: .equal) {
 			defaultValue = try expression() as Expression
 		}
 		return Parameter(label: name, variable: variable, default: defaultValue)
 	}
 	
-	mutating func functionHead() throws -> (parameters: [Parameter], returns: [Type], isVarArg: Bool) {
+	mutating func functionHead(allowDefaults: Bool = true) throws -> (parameters: [Parameter], returns: [Type], isVarArg: Bool) {
 		try expect(operator: .roundBracketLeft)
 		var wasComma = false
 		var parameters = [Parameter]()
-		while let parameter = try parameter() as Parameter? {
+		while let parameter = try parameter(allowDefaults: allowDefaults) as Parameter? {
 			parameters.append(parameter)
 			wasComma = consume(operator: .comma)
 			if !wasComma {

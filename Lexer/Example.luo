@@ -1,10 +1,3 @@
-enum SubmissionState
-	complete,
-	sent,
-	networkError(String),
-	validationError(String),
-end
-
 class Person: Object
 
 	property isMale: Boolean? -- allows nil
@@ -26,6 +19,8 @@ class Person: Object
 		self.firstName = firstName
 		self.lastName = lastName
 		self.isMale = isMale
+
+		test(firstName)
 	end
 
 	function test(value): Boolean
@@ -36,5 +31,20 @@ class Person: Object
 
 		-- what do we want optionals to do? do we want to have to unwrap them?
 	end
+
+end
+
+enum SubmissionState
+	complete,
+	sent,
+	networkError(String),
+	validationError(String),
+end
+
+protocol Object
+
+	property age: Number
+
+	function initialise(firstName: String = "John", lastName: String = "Smith", isMale: Boolean)
 
 end
