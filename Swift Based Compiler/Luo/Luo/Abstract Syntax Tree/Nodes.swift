@@ -29,7 +29,7 @@ enum TopStatement {
 	case `protocol`(Protocol, at: TokenIndex)
 	case `enum`(Enum, at: TokenIndex)
 	case statement(Statement, at: TokenIndex)
-	case `typealias`(Name, aliases: Type, at: TokenIndex)
+	case `typeAlias`(Name, of: Type, at: TokenIndex)
 	
 }
 

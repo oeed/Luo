@@ -9,14 +9,15 @@
 import Foundation
 
 protocol ResolvedObject {
-	
-	var at: TokenIndex { get }
-	var name: Name { get }
+		
+    var name: Name { get }
+    var at: TokenIndex { get }
 
 }
 
-protocol Confirming {
-	
+protocol Conforming {
+    
+    var protocols: [ResolvedProtocol] { get set }
 	func resolveConforms() throws
 	
 }
@@ -25,7 +26,7 @@ protocol Conformable {
 	
 }
 
-class ResolvedClass: ResolvedObject, Conformable, Confirming {
+class ResolvedClass: ResolvedObject, Conformable, Conforming {
 	
 	let name: Name
 	let node: Class
@@ -84,14 +85,15 @@ class ResolvedClass: ResolvedObject, Conformable, Confirming {
 	
 }
 
-class ResolvedProtocol: ResolvedObject, Conformable {
+class ResolvedProtocol: ResolvedObject, Conformable, Conforming {
 	
 	let name: Name
 	let node: Protocol
 	let at: TokenIndex
 	
 	private let resolver: Resolver
-	
+    
+    var protocols = [ResolvedProtocol]()
 	//var conforms: [Conformable]
 	
 	init(_ node: Protocol, at: TokenIndex, resolver: Resolver) {
@@ -118,4 +120,140 @@ class ResolvedEnum: ResolvedObject {
 		self.at = at
 	}
 	
+}
+
+indirect enum ResolvedType {
+    
+    case any
+    case optional(ResolvedType)
+    case array(value: ResolvedType)
+    case dictionary(key: ResolvedType, value: ResolvedType)
+    case `protocol`(ResolvedProtocol)
+    case instance(of: ResolvedClass)
+    case `enum`(ResolvedEnum)
+    case metaClass(ResolvedClass)
+    case metaProtocol(ResolvedProtocol)
+    
+    // check if the both types are an exact match (for protocols)
+    static func ==(_ lhs: ResolvedType, _ rhs: ResolvedType) {
+        
+    }
+    
+    // checks if self fits matches type to (self can be a subclass of type)
+    func conforms(to: ResolvedType) -> Bool {
+        switch to {
+        case .optional(let toSub):
+            // if self is optional, to also has to be optional, and the contents of both optionals has to match
+            switch self {
+            case .optional(let selfSub):
+                return selfSub.conforms(to: toSub)
+            default:
+                return false
+            }
+        case .any:
+            // any can be anything except optional
+            switch self {
+            case .optional(_):
+                return false
+            default:
+                return true
+            }
+        case .array(value: let toValue):
+            // to also has to be array and value has to match
+            switch self {
+            case .array(let selfValue):
+                return selfValue.conforms(to: toValue)
+            default:
+                return false
+            }
+        case .dictionary(key: let toKey, value: let toValue):
+            // to also has to be dictionary and both key and value have to match
+            switch self {
+            case .dictionary(key: let selfKey, value: let selfValue):
+                return selfKey.conforms(to: toKey) && selfValue.conforms(to: toValue)
+            default:
+                return false
+            }
+        case .enum(let toEnum):
+            switch self {
+            case .enum(let selfEnum):
+                // enums can only be an exact match
+                return toEnum === selfEnum
+            default: break
+            }
+            return false
+        case .protocol(let toProtocol):
+            switch self {
+            case .protocol(let selfProtocol):
+                // if the target is a protocol and we're a protocol we either have to be the same protocol or conform to it
+                if toProtocol === selfProtocol {
+                    return true
+                }
+                
+                for proto in selfProtocol.protocols {
+                    if toProtocol === proto {
+                        return true
+                    }
+                }
+            case .instance(of: let selfClass):
+                // if the target is a protocol and we're an instance we have to conform to it
+                for proto in selfClass.protocols {
+                    if toProtocol === proto {
+                        return true
+                    }
+                }
+            default: break
+            }
+            return false
+        case .instance(of: let toClass):
+            switch self {
+            case .instance(of: let selfClass):
+                // if the target is a class (instance) a class instance has to be used and is either an exact match or a subclass
+                if selfClass === toClass {
+                    return true
+                }
+                
+                var superClass = selfClass.superClass
+                while superClass != nil {
+                    if superClass! === toClass {
+                        return true
+                    }
+                    superClass = superClass!.superClass
+                }
+            default: break
+            }
+            return false
+        case .metaProtocol(let toMetaProtocol):
+            switch self {
+            case .metaClass(of: let selfMetaClass):
+                // if the target is a protocol we need to be a meta class that conforms
+                for proto in selfMetaClass.protocols {
+                    if toMetaProtocol === proto {
+                        return true
+                    }
+                }
+            default: break
+            }
+            return false
+        case .metaClass(of: let toMetaClass):
+            switch self {
+            case .metaClass(of: let selfMetaClass):
+                // if the target is a class a class has to be used and is either an exact match or a subclass
+                if selfMetaClass === toMetaClass {
+                    return true
+                }
+                
+                var superClass = selfMetaClass.superClass
+                while superClass != nil {
+                    if superClass! === toMetaClass {
+                        return true
+                    }
+                    superClass = superClass!.superClass
+                }
+            default: break
+            }
+            return false
+        }
+    }
+    
 }

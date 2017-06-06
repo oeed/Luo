@@ -55,7 +55,7 @@ struct AbstractSyntaxTree {
 				case .typealias:
 					let name: Identifier = try identifier()
 					try expect(operator: .equal)
-					topStatements.append(.typealias(name, aliases: try type(), at: index))
+					topStatements.append(.typeAlias(name, aliases: try type(), at: index))
 				case .end:
 					break token
 				default:
