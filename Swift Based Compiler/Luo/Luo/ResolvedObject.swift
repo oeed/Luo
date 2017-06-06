@@ -103,6 +103,14 @@ class ResolvedProtocol: ResolvedObject, Conformable, Conforming {
 		self.at = at
 	}
 	
+    private var hasResolvedConforms = false
+    func resolveConforms() throws {
+        if hasResolvedConforms {
+            return
+        }
+        hasResolvedConforms = true
+    }
+    
 }
 
 class ResolvedEnum: ResolvedObject {
@@ -133,6 +141,43 @@ indirect enum ResolvedType {
     case `enum`(ResolvedEnum)
     case metaClass(ResolvedClass)
     case metaProtocol(ResolvedProtocol)
+    
+    init(type: Type, resolver: Resolver) throws {
+        switch type {
+        case .optional(let subType):
+            self = .optional(try ResolvedType(type: subType, resolver: resolver))
+        case .array(value: let value, at: _):
+            self = .array(value: try ResolvedType(type: value, resolver: resolver))
+        case .dictionary(key: let key, value: let value, at: _):
+            self = .dictionary(key: try ResolvedType(type: key, resolver: resolver), value: try ResolvedType(type: value, resolver: resolver))
+        case .name(name: let name, at: let index):
+            let object = try resolver.object(named: name, at: index)
+            if object is ResolvedClass {
+                self = .instance(of: object as! ResolvedClass)
+            }
+            else if object is ResolvedProtocol {
+                self = .protocol(object as! ResolvedProtocol)
+            }
+            else {
+                self = .enum(object as! ResolvedEnum)
+            }
+        case .index(parent: let parent, name: let name, at: let index):
+            if name != "Type" {
+                throw ResolverError.invalidIndex(name, at: index)
+            }
+            
+            let object = try resolver.object(named: parent, at: index)
+            if object is ResolvedClass {
+                self = .metaClass(object as! ResolvedClass)
+            }
+            else if object is ResolvedProtocol {
+                self = .metaProtocol(object as! ResolvedProtocol)
+            }
+            else {
+                throw ResolverError.invalidIndexedType(parent, at: index)
+            }
+        }
+    }
     
     // check if the both types are an exact match (for protocols)
     static func ==(_ lhs: ResolvedType, _ rhs: ResolvedType) -> Bool {

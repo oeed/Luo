@@ -18,6 +18,8 @@ enum ResolverError: Error {
 	case duplicateProtocol(Name, at: TokenIndex)
 	case undefinedType(Name, at: TokenIndex)
 	case duplicateType(Name, at: TokenIndex)
+    case invalidIndex(Name, at: TokenIndex)
+    case invalidIndexedType(Name, at: TokenIndex)
 	
 }
 
@@ -63,7 +65,7 @@ struct Resolver {
 		
 		// resolve all conforms
 		for (_, object) in objects {
-			try (object as? Confirming)?.resolveConforms()
+			try (object as? Conforming)?.resolveConforms()
 		}
 	}
 	
