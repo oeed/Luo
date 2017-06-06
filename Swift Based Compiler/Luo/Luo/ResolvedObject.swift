@@ -135,8 +135,74 @@ indirect enum ResolvedType {
     case metaProtocol(ResolvedProtocol)
     
     // check if the both types are an exact match (for protocols)
-    static func ==(_ lhs: ResolvedType, _ rhs: ResolvedType) {
-        
+    static func ==(_ lhs: ResolvedType, _ rhs: ResolvedType) -> Bool {
+        // all of these need to be exact matches
+        switch lhs {
+        case .any:
+            // any can be anything except optional
+            switch rhs {
+            case .optional(_):
+                return false
+            default:
+                return true
+            }
+        case .optional(let lhsSub):
+            switch rhs {
+            case .optional(let rhsSub):
+                return lhsSub == rhsSub
+            default:
+                return false
+            }
+        case .array(value: let lhsValue):
+            switch rhs {
+            case .array(value: let rhsValue):
+                return lhsValue == rhsValue
+            default:
+                return false
+            }
+        case .dictionary(key: let lhsKey, value: let lhsValue):
+            switch rhs {
+            case .dictionary(key: let rhsKey, value: let rhsValue):
+                return lhsKey == rhsKey && lhsValue == rhsValue
+            default:
+                return false
+            }
+        case .protocol(let lhsProtocol):
+            switch rhs {
+            case .protocol(let rhsProtocol):
+                return lhsProtocol === rhsProtocol
+            default:
+                return false
+            }
+        case .instance(of: let lhsInstance):
+            switch rhs {
+            case .instance(of: let rhsInstance):
+                return lhsInstance === rhsInstance
+            default:
+                return false
+            }
+        case .enum(let lhsEnum):
+            switch rhs {
+            case .enum(let rhsEnum):
+                return lhsEnum === rhsEnum
+            default:
+                return false
+            }
+        case .metaClass(let lhsMetaClass):
+            switch rhs {
+            case .metaClass(let rhsMetaClass):
+                return lhsMetaClass === rhsMetaClass
+            default:
+                return false
+            }
+        case .metaProtocol(let lhsMetaProtocol):
+            switch rhs {
+            case .metaProtocol(let rhsMetaProtocol):
+                return lhsMetaProtocol === rhsMetaProtocol
+            default:
+                return false
+            }
+        }
     }
     
     // checks if self fits matches type to (self can be a subclass of type)
