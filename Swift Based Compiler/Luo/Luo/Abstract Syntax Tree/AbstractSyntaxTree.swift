@@ -675,7 +675,7 @@ struct AbstractSyntaxTree {
 	
 	mutating func parameter(allowDefaults: Bool) throws -> Parameter? {
 		var label: Identifier? = try identifier() as Identifier
-		let name: Identifier? = try identifier()
+		let name: Identifier? = identifier()
 		var variable: TypedIdentifier
 		var theType: Type?
 		if consume(operator: .colon) {
