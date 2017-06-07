@@ -601,6 +601,7 @@ struct AbstractSyntaxTree {
 			else {
 				theType = .array(value: subType, at: index)
 			}
+            try expect(operator: .squareBracketRight)
 		}
 		else {
 			// this is a name or index type
