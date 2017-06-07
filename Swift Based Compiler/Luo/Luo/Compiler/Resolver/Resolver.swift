@@ -20,17 +20,18 @@ enum ResolverError: Error {
 	case duplicateType(Name, at: TokenIndex)
     case invalidIndex(Name, at: TokenIndex)
     case invalidIndexedType(Name, at: TokenIndex)
+    case recursiveSuperClass(Name, at: TokenIndex)
 	
 }
 
 typealias TypeAlias = (of: Type, at: TokenIndex)
 
-struct Resolver {
+class Resolver {
 	
 	var objects = [Name: ResolvedObject]()
 	var types = [Name: ResolvedObject]() // sometimes
 	
-	mutating func resolve(chunks: [Chunk]) throws {
+	func resolve(chunks: [Chunk]) throws {
 		// first lets get all the barebones structures for all objects
 		// at this time we check if there are any duplicate names
 //		var typeAliases = [Name: TypeAlias]()
@@ -52,7 +53,7 @@ struct Resolver {
 				if objects[object.name] != nil {
 					throw ResolverError.duplicateName(object.name, at: object.at)
 				}
-				
+                
 				objects[object.name] = object
 				types[object.name] = object
 			}
@@ -67,9 +68,14 @@ struct Resolver {
 		for (_, object) in objects {
 			try (object as? Conforming)?.resolveConforms()
 		}
+        
+        // resolve all of the properties, defaults, functions, etc.
+        for (_, object) in objects {
+            try (object as? Bodied)?.resolveBody()
+        }
 	}
 	
-	mutating func addAlias(name: Name, typeAlias: TypeAlias, remaining: inout [Name: TypeAlias]) throws {
+	func addAlias(name: Name, typeAlias: TypeAlias, remaining: inout [Name: TypeAlias]) throws {
 		// check that it hasn't already been defined
 		if types[name] != nil {
 			throw ResolverError.duplicateType(name, at: typeAlias.at)
@@ -88,6 +94,7 @@ struct Resolver {
 		if let object = objects[name] {
 			return object
 		}
+        print(self)
 		throw ResolverError.undefinedObject(name, at: index)
 	}
 	

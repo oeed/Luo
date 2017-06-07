@@ -1,10 +1,25 @@
-
-
-protocol One
+class String
 end
 
-class Two: One, One
+class Number
 end
 
-class Three: Two, One
+class One
+	property name: String
+	function test(one: String, two: [String], three: [String: Number])
 end
+
+class Two
+	default name = "John"
+	function test(one: String, two: [String], three: [String: Number])
+end
+
+-- protocol Tester
+-- 	function test(one: String, two: [String], three: [String: Number])
+-- end
+
+-- class Test
+
+-- 	function test(one: String, two: [String], three: [String: Number])
+
+-- end

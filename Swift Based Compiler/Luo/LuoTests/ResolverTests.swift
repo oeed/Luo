@@ -21,7 +21,7 @@ class ResolverTests: XCTestCase {
     }
 
     func testExample() {
-        let 
+        let resolver = Resolver()
         XCTAssert(<#T##expression: Bool##Bool#>)
     }
 

@@ -26,6 +26,12 @@ protocol Conformable {
 	
 }
 
+protocol Bodied {
+    
+    func resolveBody() throws
+    
+}
+
 class ResolvedClass: ResolvedObject, Conformable, Conforming {
 	
 	let name: Name
@@ -59,6 +65,14 @@ class ResolvedClass: ResolvedObject, Conformable, Conforming {
 				}
 				superClass = object as? ResolvedClass
 				try superClass?.resolveConforms()
+                // check that a super class doesn't inherit self
+                var sClass = superClass
+                while sClass != nil {
+                    if sClass! === self {
+                        throw ResolverError.recursiveSuperClass(name, at: index)
+                    }
+                    sClass = sClass!.superClass
+                }
 				
 				// now inherit all of the super classes
 				for proto in superClass!.protocols {
@@ -71,6 +85,17 @@ class ResolvedClass: ResolvedObject, Conformable, Conforming {
 			}
 		}
 	}
+    
+    func resolveBody() throws {
+        // now that we have all of the super classes loaded we need to build the barebones functions and properties
+        var theClass: ResolvedClass? = self
+        while theClass != nil {
+            if theClass! === self {
+                throw ResolverError.recursiveSuperClass(name, at: at)
+            }
+            theClass = theClass!.superClass
+        }
+    }
 	
 	func add(protocol added: ResolvedProtocol, at index: TokenIndex) throws {
 		// check that the protocol isn't already being conformed to
